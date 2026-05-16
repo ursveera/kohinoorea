@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "Server\\Kohinoorea.Server.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "Client\\Kohinoorea.Client.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

@@ -1,0 +1,226 @@
+@page "/pricing"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Net.Http.Headers
+@using System.Text.RegularExpressions
+@using Kohinoorea.Shared.Models.Commerce
+
+<PageTitle>Pricing</PageTitle>
+
+<main>
+    <section class="pricing-hero" id="plans">
+      <div class="container pricing-hero-shell">
+        <div>
+          <div class="eyebrow">Launch pricing</div>
+          <h1>Choose your <span class="gradient-text">Kohinoor EA</span> access.</h1>
+          <p>Start with the access window that matches your trading plan. New users complete a short onboarding request first; logged-in users continue directly to cart review.</p>
+        </div>
+        <aside class="pricing-flow-card">
+          <span class="mini-label">Purchase path</span>
+          <strong>Choose plan -> Request access -> Login -> Cart</strong>
+          <p data-flow-status>Choose a plan, register if you are new, log in, then review the cart before purchase.</p>
+        </aside>
+      </div>
+      <div class="container pricing-grid">
+        @if (pricingPlans.Count == 0 && !plansLoading)
+        {
+          <p style="color:#94a3b8; text-align:center; padding:40px 0; grid-column:1/-1;">No pricing plans available at the moment. Check back soon.</p>
+        }
+        @foreach (var plan in pricingPlans)
+        {
+          var raw = plan.Description ?? string.Empty;
+          var summaryMatch = Regex.Match(raw, @"<p>(.*?)</p>", RegexOptions.Singleline);
+          var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
+          var features = Regex.Matches(raw, @"<span>(.*?)</span>", RegexOptions.Singleline)
+                              .Select(m => m.Groups[1].Value.Trim())
+                              .Where(f => f.Length > 0)
+                              .ToList();
+          <article class="pricing-card @(plan.Id == featuredPlanId ? "featured" : null)">
+            <div class="pricing-card-top">
+              @if (plan.Id == featuredPlanId)
+              {
+                <span class="badge">Recommended</span>
+              }
+              else
+              {
+                <span class="mini-label">Plan</span>
+              }
+            </div>
+            <h3>@plan.Name</h3>
+            <div class="price"><strong>₹@plan.Price.ToString("N0")</strong></div>
+            @if (!string.IsNullOrEmpty(summary))
+            {
+              <p class="pricing-plan-summary">@summary</p>
+            }
+            @if (features.Count > 0)
+            {
+              <ul class="pricing-feature-list">
+                @foreach (var feature in features)
+                {
+                  <li>@feature</li>
+                }
+              </ul>
+            }
+            <div class="button-group">
+              <button class="button button-primary" type="button" @onclick="() => SelectProductPlanAsync(plan.Id)">Choose @plan.Name</button>
+            </div>
+            <div class="link-list">
+              <div class="link-item">
+                <strong>Telegram order</strong>
+                <a href="https://t.me/kohinoor">Open chat</a>
+              </div>
+              <div class="link-item">
+                <strong>Email order</strong>
+                <a href="mailto:support@kohinoorea.com">Send request</a>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="section pricing-offer-section">
+      <div class="container pricing-offer-panel">
+        <div>
+          <div class="eyebrow">Special pricing ends soon</div>
+          <h2 class="section-title">Secure your access before launch rates increase.</h2>
+          <p>Use promo code <strong>LAUNCH26</strong> for an extra 15% off eligible annual and lifetime access during the current launch promotion.</p>
+        </div>
+        <div class="promo-code-card">
+          <span>Promo code</span>
+          <strong>LAUNCH26</strong>
+          <small>15% extra off</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container pricing-next-grid">
+        <article class="panel">
+          <span class="badge">New users</span>
+          <h2 class="section-title">Need onboarding first?</h2>
+          <p>Choose a plan and submit your access request. We collect your setup details before you continue to login and cart.</p>
+          <button class="button button-primary" type="button" @onclick="SelectAnnualPlan">Request Annual Access</button>
+        </article>
+        <article class="panel">
+          <span class="badge">Demo route</span>
+          <h2 class="section-title">Not ready to buy?</h2>
+          <p>Use the demo request path for guided evaluation before selecting monthly, annual, or lifetime access.</p>
+          <a class="button button-secondary" href="/registration?plan=demo" data-flow-plan="demo">Free Trial / Demo</a>
+        </article>
+        <article class="panel">
+          <span class="badge">Existing clients</span>
+          <h2 class="section-title">Already logged in?</h2>
+          <p>Once logged in, choosing a plan sends you directly to the cart review and purchase path.</p>
+          <a class="button button-tertiary" href="/login?plan=annual">Client Login</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div><strong>Kohinoor EA</strong></div>
+      <div><p>Annual plan is highlighted as the primary conversion path.</p></div>
+    </div>
+  </footer>
+<script src="assets/js/commerce-flow.js"></script>
+
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+@code {
+  private List<ProductDto> pricingPlans = new();
+  private bool plansLoading = true;
+  private long? featuredPlanId;
+
+  private sealed class IpapiResponse
+  {
+    [System.Text.Json.Serialization.JsonPropertyName("country_code")]
+    public string? CountryCode { get; set; }
+  }
+
+  protected override async Task OnInitializedAsync()
+  {
+    try
+    {
+      // Detect visitor country — fall back silently if blocked/failed
+      string? detectedCountry = null;
+      try
+      {
+        var geo = await Http.GetFromJsonAsync<IpapiResponse>("https://ipapi.co/json/");
+        detectedCountry = geo?.CountryCode;
+      }
+      catch { /* ignore geo failure, load all plans */ }
+
+      var url = string.IsNullOrWhiteSpace(detectedCountry)
+        ? "api/commerce/pricing-plans"
+        : $"api/commerce/pricing-plans?country={Uri.EscapeDataString(detectedCountry)}";
+
+      var plans = await Http.GetFromJsonAsync<List<ProductDto>>(url);
+      pricingPlans = plans ?? new List<ProductDto>();
+      // Mark the middle plan (or highest-priced) as featured
+      if (pricingPlans.Count == 3)
+        featuredPlanId = pricingPlans[1].Id;
+      else if (pricingPlans.Count > 0)
+        featuredPlanId = pricingPlans.MaxBy(p => p.Price)?.Id;
+    }
+    catch
+    {
+      pricingPlans = new List<ProductDto>();
+    }
+    finally
+    {
+      plansLoading = false;
+    }
+  }
+
+  private async Task SelectProductPlanAsync(long productId)
+  {
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+      Navigation.NavigateTo($"/registration?plan=product-{productId}", true);
+      return;
+    }
+
+    Navigation.NavigateTo($"/buy-product?productId={productId}", true);
+  }
+
+  private Task SelectMonthlyPlan() => SelectPlanAsync("monthly");
+  private Task SelectAnnualPlan() => SelectPlanAsync("annual");
+  private Task SelectLifetimePlan() => SelectPlanAsync("lifetime");
+
+  private async Task SelectPlanAsync(string planKey)
+  {
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+      Navigation.NavigateTo($"/registration?plan={Uri.EscapeDataString(planKey)}", true);
+      return;
+    }
+
+    Navigation.NavigateTo($"/cart?plan={Uri.EscapeDataString(planKey)}", true);
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token))
+    {
+      return true;
+    }
+
+    var jwt = handler.ReadJwtToken(token);
+    return jwt.ValidTo <= DateTime.UtcNow;
+  }
+}
+

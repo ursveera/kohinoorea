@@ -1,0 +1,693 @@
+@page "/buy-product"
+@using System.Net.Http.Headers
+@using System.IdentityModel.Tokens.Jwt
+@using System.Text.RegularExpressions
+
+<PageTitle>Buy Product</PageTitle>
+
+<style>
+  /* ── Theme tokens ─────────────────────────────────── */
+  :root, body[data-theme="dark"] {
+    --bp-bg:        linear-gradient(135deg,#060810 0%,#0f1623 55%,#040609 100%);
+    --bp-glow1:     rgba(251,191,36,0.14);
+    --bp-glow2:     rgba(128,90,213,0.14);
+    --bp-text:      #f0f4ff;
+    --bp-muted:     #7b8fa8;
+    --bp-card-bg:   rgba(255,255,255,0.04);
+    --bp-card-bg2:  rgba(255,255,255,0.06);
+    --bp-card-border: rgba(255,255,255,0.09);
+    --bp-card-border2: rgba(251,191,36,0.18);
+    --bp-divider:   rgba(255,255,255,0.07);
+    --bp-divider2:  rgba(255,255,255,0.11);
+    --bp-back-color:#6b7fa0;
+    --bp-sec-bg:    rgba(255,255,255,0.05);
+    --bp-sec-border:rgba(255,255,255,0.14);
+    --bp-sec-text:  #c8d4e8;
+    --bp-notice-bg: rgba(96,165,250,0.08);
+    --bp-notice-border: rgba(96,165,250,0.18);
+    --bp-notice-text:#7eb8f7;
+    --bp-err-bg:    rgba(248,113,113,0.1);
+    --bp-err-border:rgba(248,113,113,0.28);
+    --bp-err-text:  #fca5a5;
+    --bp-shimmer:   rgba(255,255,255,0.03);
+    --bp-img-fallback: linear-gradient(135deg,#1a2235,#2d3f5c);
+    --bp-success-bg: linear-gradient(135deg,#060810,#0f1623);
+    --bp-success-glow: rgba(34,197,94,0.1);
+  }
+
+  body[data-theme="light"] {
+    --bp-bg:        linear-gradient(135deg,#f0f4ff 0%,#faf6ee 50%,#f5f0ff 100%);
+    --bp-glow1:     rgba(251,191,36,0.22);
+    --bp-glow2:     rgba(128,90,213,0.12);
+    --bp-text:      #111827;
+    --bp-muted:     #6b7280;
+    --bp-card-bg:   rgba(255,255,255,0.75);
+    --bp-card-bg2:  rgba(255,255,255,0.9);
+    --bp-card-border: rgba(0,0,0,0.09);
+    --bp-card-border2: rgba(251,191,36,0.35);
+    --bp-divider:   rgba(0,0,0,0.07);
+    --bp-divider2:  rgba(0,0,0,0.10);
+    --bp-back-color:#6b7280;
+    --bp-sec-bg:    rgba(0,0,0,0.04);
+    --bp-sec-border:rgba(0,0,0,0.12);
+    --bp-sec-text:  #374151;
+    --bp-notice-bg: rgba(59,130,246,0.07);
+    --bp-notice-border:rgba(59,130,246,0.2);
+    --bp-notice-text:#2563eb;
+    --bp-err-bg:    rgba(239,68,68,0.08);
+    --bp-err-border:rgba(239,68,68,0.25);
+    --bp-err-text:  #dc2626;
+    --bp-shimmer:   rgba(255,255,255,0.6);
+    --bp-img-fallback: linear-gradient(135deg,#dde3f0,#c7d2e8);
+    --bp-success-bg: linear-gradient(135deg,#f0f9f4,#ecfdf5);
+    --bp-success-glow: rgba(34,197,94,0.08);
+  }
+
+  /* ── Shell ────────────────────────────────────────── */
+  .bp-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 15% 10%, var(--bp-glow1), transparent 38%),
+      radial-gradient(circle at 85% 85%, var(--bp-glow2), transparent 38%),
+      var(--bp-bg);
+    color: var(--bp-text);
+    font-family: "Inter", sans-serif;
+    padding: 14px 24px 20px;
+    transition: background 0.35s, color 0.25s;
+  }
+
+  .bp-container {
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  /* ── Back link ────────────────────────────────────── */
+  .bp-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--bp-back-color);
+    text-decoration: none;
+    margin-bottom: 10px;
+    transition: color 0.2s, gap 0.2s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    letter-spacing: 0.01em;
+  }
+  .bp-back:hover { color: #fbbf24; gap: 10px; }
+
+  /* ── Eyebrow ──────────────────────────────────────── */
+  .bp-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #f59e0b;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bp-eyebrow::before {
+    content: "";
+    width: 18px; height: 2px;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    border-radius: 2px;
+  }
+
+  /* ── Layout grid ──────────────────────────────────── */
+  .bp-layout {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  @@media (max-width: 780px) {
+    .bp-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ── Cards ────────────────────────────────────────── */
+  .bp-product-card,
+  .bp-checkout-card {
+    background: var(--bp-card-bg);
+    border: 1px solid var(--bp-card-border);
+    border-radius: 22px;
+    padding: 18px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12), inset 0 1px 0 var(--bp-shimmer);
+    transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  }
+  .bp-checkout-card {
+    position: sticky;
+    top: 14px;
+    border-color: var(--bp-card-border2);
+    box-shadow: 0 8px 40px rgba(251,191,36,0.08), 0 2px 12px rgba(0,0,0,0.1), inset 0 1px 0 var(--bp-shimmer);
+  }
+
+  /* ── Product image ────────────────────────────────── */
+  .bp-product-img {
+    width: 100%;
+    height: 130px;
+    border-radius: 14px;
+    object-fit: cover;
+    margin-bottom: 12px;
+    background: var(--bp-img-fallback);
+    display: block;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+
+  /* ── Badge ────────────────────────────────────────── */
+  .bp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    background: rgba(251,191,36,0.13);
+    color: #f59e0b;
+    border: 1px solid rgba(251,191,36,0.28);
+    margin-bottom: 9px;
+    box-shadow: 0 0 12px rgba(251,191,36,0.08);
+  }
+
+  /* ── Product text ─────────────────────────────────── */
+  .bp-product-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-bottom: 6px;
+    line-height: 1.22;
+    color: var(--bp-text);
+  }
+
+  .bp-product-desc {
+    color: var(--bp-muted);
+    font-size: 13px;
+    line-height: 1.55;
+    margin-bottom: 10px;
+  }
+
+  /* ── Feature list ─────────────────────────────────── */
+  .bp-feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px;
+    display: grid;
+    gap: 6px;
+  }
+  .bp-feature-list li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    color: var(--bp-sec-text);
+  }
+  .bp-feature-list li::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,#fbbf24,#f97316);
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(251,191,36,0.4);
+  }
+
+  /* ── Price block ──────────────────────────────────── */
+  .bp-price-block {
+    padding: 11px 15px;
+    border-radius: 14px;
+    background: linear-gradient(135deg,rgba(251,191,36,0.09),rgba(249,115,22,0.05));
+    border: 1px solid rgba(251,191,36,0.18);
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bp-price-label {
+    font-size: 11px;
+    color: var(--bp-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+  }
+  .bp-price-value {
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  /* ── Checkout card internals ──────────────────────── */
+  .bp-checkout-title {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-bottom: 3px;
+    color: var(--bp-text);
+  }
+  .bp-checkout-sub {
+    color: var(--bp-muted);
+    font-size: 12px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+
+  .bp-summary-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--bp-divider);
+    font-size: 13px;
+  }
+  .bp-summary-line:last-of-type { border-bottom: none; }
+  .bp-summary-line span { color: var(--bp-muted); }
+  .bp-summary-line strong { color: var(--bp-text); font-weight: 700; }
+
+  .bp-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 0 11px;
+    margin-top: 4px;
+    border-top: 1px solid var(--bp-divider2);
+  }
+  .bp-total-label { font-size: 13px; color: var(--bp-muted); font-weight: 600; }
+  .bp-total-price {
+    font-size: 22px;
+    font-weight: 900;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Buttons ──────────────────────────────────────── */
+  .bp-btn-primary {
+    width: 100%;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg,#fbbf24 0%,#f97316 100%);
+    color: #111827;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+    box-shadow: 0 6px 26px rgba(251,191,36,0.38), 0 1px 4px rgba(0,0,0,0.2);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+    position: relative;
+    overflow: hidden;
+  }
+  .bp-btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,rgba(255,255,255,0.18),transparent);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .bp-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 38px rgba(251,191,36,0.48), 0 2px 8px rgba(0,0,0,0.2);
+    filter: brightness(1.05);
+  }
+  .bp-btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .bp-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .bp-btn-secondary {
+    width: 100%;
+    padding: 11px 24px;
+    border: 1px solid var(--bp-sec-border);
+    border-radius: 14px;
+    background: var(--bp-sec-bg);
+    color: var(--bp-sec-text);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    text-align: center;
+    display: block;
+    text-decoration: none;
+  }
+  .bp-btn-secondary:hover {
+    background: rgba(251,191,36,0.07);
+    border-color: rgba(251,191,36,0.3);
+    color: #f59e0b;
+  }
+
+  /* ── Notice ───────────────────────────────────────── */
+  .bp-notice {
+    padding: 11px 14px;
+    border-radius: 12px;
+    background: var(--bp-notice-bg);
+    border: 1px solid var(--bp-notice-border);
+    font-size: 11.5px;
+    color: var(--bp-notice-text);
+    line-height: 1.6;
+    margin-top: 10px;
+  }
+
+  /* ── Status ───────────────────────────────────────── */
+  .bp-status {
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 10px;
+    text-align: center;
+  }
+  .bp-status.error {
+    background: var(--bp-err-bg);
+    border: 1px solid var(--bp-err-border);
+    color: var(--bp-err-text);
+  }
+
+  /* ── Success screen ───────────────────────────────── */
+  .bp-success-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 30% 20%, var(--bp-success-glow), transparent 45%),
+      var(--bp-success-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Inter", sans-serif;
+    padding: 48px 24px;
+    transition: background 0.35s;
+  }
+  .bp-success-card {
+    max-width: 520px;
+    width: 100%;
+    background: var(--bp-card-bg2);
+    border: 1px solid rgba(34,197,94,0.22);
+    border-radius: 26px;
+    padding: 44px 36px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 40px rgba(34,197,94,0.08), 0 2px 12px rgba(0,0,0,0.1);
+  }
+  .bp-success-icon {
+    width: 68px; height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.08));
+    border: 2px solid rgba(34,197,94,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 30px;
+    box-shadow: 0 0 30px rgba(34,197,94,0.15);
+  }
+  .bp-success-card h2 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-bottom: 10px;
+    color: var(--bp-text);
+  }
+  .bp-success-card p {
+    color: var(--bp-muted);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 24px;
+  }
+  .bp-order-pill {
+    display: inline-block;
+    padding: 9px 20px;
+    border-radius: 999px;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.28);
+    color: #22c55e;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Loading ──────────────────────────────────────── */
+  .bp-loading-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bp-bg);
+    font-family: "Inter", sans-serif;
+    color: var(--bp-muted);
+    font-size: 15px;
+  }
+</style>
+
+@if (loading)
+{
+  <div class="bp-loading-shell">Loading product details...</div>
+}
+else if (orderSuccess)
+{
+  <div class="bp-success-shell">
+    <div class="bp-success-card">
+      <div class="bp-success-icon">✓</div>
+      <h2>Order Confirmed!</h2>
+      <p>Your order for <strong style="color:var(--bp-text);">@product?.Name</strong> has been placed successfully. Check your dashboard for order status and activation details.</p>
+      <div class="bp-order-pill">Order ID: ORD-@createdOrderId</div>
+      <br />
+      <a class="bp-btn-primary" style="display:block; text-decoration:none; text-align:center;" href="/dashboard">Go to Dashboard</a>
+      <a class="bp-btn-secondary" style="margin-top:12px;" href="/dashboard#products">Browse More Products</a>
+    </div>
+  </div>
+}
+else
+{
+  <div class="bp-shell">
+    <div class="bp-container">
+      <button class="bp-back" type="button" @onclick="GoBack">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to Dashboard
+      </button>
+
+      <div class="bp-eyebrow">Product Purchase</div>
+      <h1 style="font-size:26px; font-weight:900; letter-spacing:-0.05em; margin-bottom:4px; color:var(--bp-text);">
+        Complete your <span style="background:linear-gradient(90deg,#fbbf24,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">purchase</span>
+      </h1>
+      <p style="color:var(--bp-muted); font-size:13px; margin-bottom:14px; max-width:520px;">Review your selected product, confirm the details, and place your order securely.</p>
+
+      @if (product is null)
+      {
+        <div class="bp-status error">@(statusMessage ?? "Product not found.")</div>
+      }
+      else
+      {
+        <div class="bp-layout">
+          <!-- Product Details -->
+          <div class="bp-product-card">
+            <img class="bp-product-img"
+                 src="@GetImageUrl()"
+                 alt="@product.Name" />
+
+            <span class="bp-badge">Admin Product</span>
+            <h2 class="bp-product-name">@product.Name</h2>
+            @{
+              var raw = product.Description ?? string.Empty;
+              var summaryMatch = Regex.Match(raw, @"<p>(.*?)</p>", RegexOptions.Singleline);
+              var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : "Premium Kohinoor EA product for MT4 automated trading on XAUUSD.";
+              var features = Regex.Matches(raw, @"<span>(.*?)</span>", RegexOptions.Singleline)
+                                  .Select(m => m.Groups[1].Value.Trim())
+                                  .Where(f => f.Length > 0)
+                                  .ToList();
+              if (features.Count == 0)
+                features = new List<string> { "MT4 compatible setup included", "XAUUSD focused trading workflow", "Direct support after purchase", "Activation guidance provided" };
+            }
+            <p class="bp-product-desc">@summary</p>
+
+            <ul class="bp-feature-list">
+              @foreach (var feature in features)
+              {
+                <li>@feature</li>
+              }
+            </ul>
+
+            <div class="bp-price-block">
+              <div>
+                <div class="bp-price-label">Product Price</div>
+                <div class="bp-price-value">₹@product.Price.ToString("N0")</div>
+              </div>
+              <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#fbbf24" opacity="0.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+
+          <!-- Checkout -->
+          <div class="bp-checkout-card">
+            <span class="bp-badge">Secure Checkout</span>
+            <h2 class="bp-checkout-title">Order Summary</h2>
+            <p class="bp-checkout-sub">Confirm your selection below and place your order to proceed with activation.</p>
+
+            <div class="bp-summary-line">
+              <span>Product</span>
+              <strong>@product.Name</strong>
+            </div>
+            <div class="bp-summary-line">
+              <span>Quantity</span>
+              <strong>1</strong>
+            </div>
+            <div class="bp-summary-line">
+              <span>Platform</span>
+              <strong>MT4 / XAUUSD</strong>
+            </div>
+            <div class="bp-summary-line">
+              <span>Support</span>
+              <strong>Included</strong>
+            </div>
+
+            <div class="bp-total-row">
+              <span class="bp-total-label">Total</span>
+              <span class="bp-total-price">₹@product.Price.ToString("N0")</span>
+            </div>
+
+            <button class="bp-btn-primary" type="button" @onclick="BuyNowAsync" disabled="@buying">
+              @(buying ? "Placing Order..." : "Confirm & Place Order")
+            </button>
+
+            <a class="bp-btn-secondary" href="/dashboard">Cancel — Back to Dashboard</a>
+
+            @if (!string.IsNullOrWhiteSpace(statusMessage))
+            {
+              <div class="bp-status error">@statusMessage</div>
+            }
+
+            <div class="bp-notice">
+              Your order will be recorded immediately. The support team will follow up with activation guidance after confirmation.
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+
+@code {
+  [Parameter]
+  [SupplyParameterFromQuery(Name = "productId")]
+  public long ProductId { get; set; }
+
+  private ProductDto? product;
+  private string? statusMessage;
+  private bool loading = true;
+  private bool buying;
+  private bool orderSuccess;
+  private long? createdOrderId;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+      Navigation.NavigateTo("/", true);
+      return;
+    }
+
+    Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+    var response = await Http.GetAsync("api/commerce/products?all=true");
+    loading = false;
+
+    if (!response.IsSuccessStatusCode)
+    {
+      statusMessage = "Unable to load product details.";
+      return;
+    }
+
+    var products = await response.Content.ReadFromJsonAsync<List<ProductDto>>();
+    product = products?.FirstOrDefault(p => p.Id == ProductId);
+
+    if (product is null)
+    {
+      statusMessage = "Product not found.";
+    }
+  }
+
+  private async Task BuyNowAsync()
+  {
+    if (product is null) return;
+
+    buying = true;
+    statusMessage = null;
+
+    try
+    {
+      var token = await LocalStorage.GetItemAsync<string>("authToken");
+      if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+      {
+        Navigation.NavigateTo("/", true);
+        return;
+      }
+
+      Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+      var response = await Http.PostAsJsonAsync("api/commerce/orders", new CreateOrderRequest
+      {
+        ProductId = product.Id,
+        Quantity = 1
+      });
+
+      if (!response.IsSuccessStatusCode)
+      {
+        statusMessage = "Unable to place order. Please try again.";
+        return;
+      }
+
+      var order = await response.Content.ReadFromJsonAsync<OrderResultDto>();
+      createdOrderId = order?.OrderId;
+      orderSuccess = true;
+    }
+    finally
+    {
+      buying = false;
+    }
+  }
+
+  private void GoBack()
+  {
+    Navigation.NavigateTo("/dashboard", false);
+  }
+
+  private string GetImageUrl()
+  {
+    if (!string.IsNullOrWhiteSpace(product?.ImageLink))
+      return product.ImageLink.Trim();
+
+    var name = product?.Name?.ToLowerInvariant() ?? string.Empty;
+    if (name.Contains("monthly")) return "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80";
+    if (name.Contains("annual")) return "https://images.unsplash.com/photo-1551281044-8b66f0f6c1b0?auto=format&fit=crop&w=800&q=80";
+    if (name.Contains("lifetime")) return "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=800&q=80";
+    return "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=800&q=80";
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token)) return true;
+    return handler.ReadJwtToken(token).ValidTo <= DateTime.UtcNow;
+  }
+}

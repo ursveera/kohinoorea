@@ -1,0 +1,12 @@
+F:\Jameer\Web App\Kohinoorea\Shared\bin\Debug\net8.0\Kohinoorea.Shared.deps.json
+F:\Jameer\Web App\Kohinoorea\Shared\bin\Debug\net8.0\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\Shared\bin\Debug\net8.0\Kohinoorea.Shared.pdb
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.GeneratedMSBuildEditorConfig.editorconfig
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.AssemblyInfoInputs.cache
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.AssemblyInfo.cs
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.csproj.CoreCompileInputs.cache
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.sourcelink.json
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\refint\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\Kohinoorea.Shared.pdb
+F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net8.0\ref\Kohinoorea.Shared.dll

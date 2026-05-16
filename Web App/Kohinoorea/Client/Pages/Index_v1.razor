@@ -1,0 +1,373 @@
+@page "/"
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Index</PageTitle>
+<main>
+    <section class="hero hero-split">
+      <div class="container hero-split-shell">
+        <div class="hero-split-content">
+          <div class="hero-split-left">
+            <div class="hero-kicker">Built for XAUUSD precision on MT4</div>
+            <h1>Built to Perform. <span class="hero-highlight">Designed to Dominate.</span></h1>
+            <p class="hero-lead">Kohinoor EA is a premium MT4 automation system for traders who want structured execution, risk-aware trade handling, and a more professional approach to XAUUSD trading.</p>
+            
+            <div class="hero-features">
+              <div class="hero-feature">
+                <svg class="hero-feature-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>0ms Latency</span>
+              </div>
+              <div class="hero-feature">
+                <svg class="hero-feature-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                <span>Encrypted Keys</span>
+              </div>
+              <div class="hero-feature">
+                <svg class="hero-feature-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>24/7 Execution</span>
+              </div>
+              <div class="hero-feature">
+                <svg class="hero-feature-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span>Real-time Analytics</span>
+              </div>
+            </div>
+
+            <div class="hero-actions">
+              <a class="button button-gold" href="/pricing#plans">Join Our Network</a>
+              <a class="button button-secondary" href="/performance">View Performance</a>
+            </div>
+
+            <div class="broker-strip" aria-label="Supported brokers">
+              <div class="broker-strip-label">Supported Brokers</div>
+              <div class="broker-marquee">
+                <div class="broker-track">
+                  <span class="broker-chip"><strong>IC</strong> IC Markets</span>
+                  <span class="broker-chip"><strong>PE</strong> PepperStone</span>
+                  <span class="broker-chip"><strong>CF</strong> CFI</span>
+                  <span class="broker-chip"><strong>XM</strong> XM Groups</span>
+                  <span class="broker-chip"><strong>EX</strong> Exness</span>
+                  <span class="broker-chip"><strong>VA</strong> Vantage</span>
+                  <span class="broker-chip"><strong>GT</strong> GTC</span>
+                  <span class="broker-chip"><strong>IC</strong> IC Markets</span>
+                  <span class="broker-chip"><strong>PE</strong> PepperStone</span>
+                  <span class="broker-chip"><strong>CF</strong> CFI</span>
+                  <span class="broker-chip"><strong>XM</strong> XM Groups</span>
+                  <span class="broker-chip"><strong>EX</strong> Exness</span>
+                  <span class="broker-chip"><strong>VA</strong> Vantage</span>
+                  <span class="broker-chip"><strong>GT</strong> GTC</span>
+                </div>
+              </div>
+            </div>
+
+          <!-- ...existing code... -->
+        </div> <!-- close hero-split-left -->
+        <div class="hero-stats-bar">
+          <div class="auth-panel">
+            <div class="auth-card">
+              <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="signin">Sign In</button>
+                <button class="auth-tab" data-tab="signup">Sign Up</button>
+              </div>
+              <!-- Sign In Content -->
+              <div class="auth-content" id="signin-content">
+                <div class="auth-header-block">
+                  <h2 class="auth-heading">Welcome Back</h2>
+                  <p class="auth-subheading">Sign in to your dashboard</p>
+                </div>
+                <div class="role-segment" id="role-segment">
+                  <button class="role-segment-btn active" data-role="trader">
+                    <svg class="role-seg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    Trader
+                  </button>
+                  <button class="role-segment-btn" data-role="admin">
+                    <svg class="role-seg-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Admin
+                  </button>
+                </div>
+                <div class="auth-form">
+                  <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <div class="input-wrapper">
+                      <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                      <input type="email" class="form-input" placeholder="you@example.com" @bind="indexLoginEmail" @bind:event="oninput">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <div class="form-label-row">
+                      <label class="form-label">Password</label>
+                      <a href="#" class="forgot-password">Forgot Password?</a>
+                    </div>
+                    <div class="input-wrapper">
+                      <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                      <input type="password" class="form-input" placeholder="Enter your password" @bind="indexLoginPassword" @bind:event="oninput">
+                    </div>
+                  </div>
+                  @if (!string.IsNullOrWhiteSpace(indexLoginMessage))
+                  {
+                    <p class="signin-footer" style="color:#f87171;">@indexLoginMessage</p>
+                  }
+                  <button type="button" class="auth-submit-button" @onclick="HandleIndexLoginAsync" disabled="@indexLoginBusy">
+                    <span class="submit-text">@(indexLoginBusy ? "Signing in..." : "Sign in as Trader")</span>
+                    <svg class="button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                  </button>
+                </div>
+                <p class="signin-footer">Don't have an account? <a href="#" class="signin-footer-link" data-switch-tab="signup">Sign up free</a></p>
+              </div>
+              <!-- Sign Up Content -->
+              <div class="auth-content" id="signup-content" style="display: none;">
+                <h2 class="auth-heading">Create Account</h2>
+                <p class="auth-subheading">Choose your portal to get started</p>
+                <div class="signup-portals">
+                  <div class="portal-card portal-trader">
+                    <div class="portal-icon">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <div class="portal-info">
+                      <h3 class="portal-title">Trader</h3>
+                      <p class="portal-desc">Access trading robots & manage licenses</p>
+                    </div>
+                    <a class="portal-signup-button" href="/registration">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                      Sign Up as Trader
+                    </a>
+                  </div>
+                  <div class="portal-card portal-admin">
+                    <div class="portal-icon">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    </div>
+                    <div class="portal-info">
+                      <h3 class="portal-title">Admin</h3>
+                      <p class="portal-desc">Invite only - contact administrator</p>
+                    </div>
+                    <button class="portal-signup-button portal-disabled" disabled>
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                      Invite Only
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+          </div>
+        </div>
+
+        <aside class="hero-console-panel">
+          <div class="hero-console-panel-top">
+            <span class="status-badge">Launch offer live</span>
+            <div class="hero-console-pill-row">
+              <span class="hero-console-pill active">MT4</span>
+              <span class="hero-console-pill">XAUUSD</span>
+              <span class="hero-console-pill">24/7</span>
+            </div>
+          </div>
+
+          <div class="hero-console-panel-block">
+            <h2>Automation built for disciplined gold trading</h2>
+            <p>Kohinoor EA combines structured trade logic, continuous monitoring, and a launch offer for traders who want a polished MT4 workflow.</p>
+          </div>
+
+          <div class="hero-console-panel-grid">
+            <div class="hero-console-panel-item">
+              <strong>Fast Opportunity Response</strong>
+              <span>Continuously watches for qualifying gold setups and reacts when predefined conditions are met.</span>
+            </div>
+            <div class="hero-console-panel-item">
+              <strong>MT4 Broker Fit</strong>
+              <span>Prepared for MT4-compatible broker accounts with XAUUSD trading access.</span>
+            </div>
+          </div>
+          <div class="hero-console-panel-grid hero-highlight-panel" data-highlight-panel="offer">
+            <div class="hero-console-panel-item">
+              <strong>Special Launch Price</strong>
+              <span>Get Kohinoor EA at a special introductory price before the next pricing update.</span>
+            </div>
+            <div class="hero-console-panel-item">
+              <strong>Promo Code LAUNCH26</strong>
+              <span>Apply the launch promo for 15% extra off eligible annual and lifetime access.</span>
+            </div>
+            <div class="hero-console-panel-item">
+              <strong>Flexible Access</strong>
+              <span>Choose monthly, annual, or lifetime access based on your trading plan.</span>
+            </div>
+            <div class="hero-console-panel-item">
+              <strong>New Client Offer</strong>
+              <span>Claim your access while introductory terms are still available.</span>
+            </div>
+          </div>
+
+          <div class="launch-offer-card">
+            <strong>Special Launch Price</strong>
+            <span>Exclusive offer for new clients. Secure your access before rates increase.</span>
+          </div>
+
+          <div class="hero-console-panel-actions">
+            <a class="button button-primary" href="/pricing#plans">Get Kohinoor EA</a>
+            <a class="button button-secondary" href="/performance">View Live Results</a>
+            <a class="button button-tertiary" href="https://wa.me/919047828806?text=Hi%20I%20want%20to%20get%20started%20with%20Kohinoor%20EA">Chat on WhatsApp</a>
+          </div>
+        </aside>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Why traders choose Kohinoor EA</h2>
+        <p class="section-copy">A premium MT4 Expert Advisor built to reduce emotional decisions, save time, and apply the same disciplined process every time the market opens an opportunity.</p>
+        <div class="metrics-grid">
+          <article class="card">
+            <h3>Emotion-Free Trading</h3>
+            <p>Removes hesitation, fear, and impulsive reactions by following predefined algorithmic conditions instead of human emotion.</p>
+          </article>
+          <article class="card">
+            <h3>Easy Setup</h3>
+            <p>Simple installation and user-friendly settings make it accessible to both new and experienced MT4 users.</p>
+          </article>
+          <article class="card">
+            <h3>Professional Efficiency</h3>
+            <p>Spend less time monitoring charts and more time managing your broader trading goals and account preferences.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container panel">
+        <span class="badge">What It Solves</span>
+        <h2 class="section-title">Trading discipline at machine speed</h2>
+        <p>Many traders struggle with inconsistent execution, missed opportunities, and lack of time. Kohinoor EA addresses those issues by automating market monitoring, trade execution, and position management using a structured rules-based process.</p>
+        <div class="button-group">
+          <a class="button button-primary" href="/about">Learn How It Works</a>
+          <a class="button button-secondary" href="https://wa.me/919047828806?text=Hi%20I%20want%20to%20see%20live%20results%20for%20Kohinoor%20EA">Chat on WhatsApp</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+
+    <section class="section">
+      <div class="container story-grid">
+        <article class="panel">
+          <span class="badge">Who it is for</span>
+          <h2 class="section-title">Built for traders who want structure</h2>
+          <p>Kohinoor EA is designed for traders who want to move away from emotional decision-making and toward a more disciplined, rules-based process.</p>
+          <ul class="list">
+            <li>MT4 users who want an automated XAUUSD workflow</li>
+            <li>Busy traders who cannot monitor charts all day</li>
+            <li>Users looking for consistent trade handling and risk-aware execution</li>
+            <li>Buyers who want support with onboarding and initial setup</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <span class="badge">What buyers get</span>
+          <h2 class="section-title">A polished trading workflow, not just a file</h2>
+          <p>The goal is not only automated entries. Kohinoor EA is positioned as a more complete trading support workflow for disciplined MT4 execution.</p>
+          <div class="stat-grid">
+            <div class="stat">
+              <strong>Automation core</strong>
+              <span>Trade execution and position management based on predefined logic.</span>
+            </div>
+            <div class="stat">
+              <strong>Risk control</strong>
+              <span>Structured handling intended to support more controlled exposure.</span>
+            </div>
+            <div class="stat">
+              <strong>Platform fit</strong>
+              <span>Prepared for MetaTrader 4 users focused on gold trading.</span>
+            </div>
+            <div class="stat">
+              <strong>Support path</strong>
+              <span>Direct WhatsApp, Telegram, and email contact for help and onboarding.</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container info-grid">
+        <article class="card">
+          <span class="badge">Step 1</span>
+          <h3>Install on MT4</h3>
+          <p>Set up Kohinoor EA on your MetaTrader 4 environment and configure the core inputs according to your account and trading preferences.</p>
+        </article>
+        <article class="card">
+          <span class="badge">Step 2</span>
+          <h3>Apply your settings</h3>
+          <p>Adjust the available configuration values to match your preferred risk profile, broker setup, and trading approach.</p>
+        </article>
+        <article class="card">
+          <span class="badge">Step 3</span>
+          <h3>Let the system monitor</h3>
+          <p>The EA watches for qualifying opportunities, executes based on programmed rules, and manages positions with consistent logic.</p>
+        </article>
+      </div>
+    </section>
+    <div class="container footer-grid">
+      <div>
+        <strong>Kohinoor EA</strong>
+        <p>www.kohinoorea.com</p>
+      </div>
+      <div>
+        <p>Premium MT4 automation for precision-driven traders.</p>
+      </div>
+    </div>
+  </footer>
+<script src="assets/js/home-hero-stack.js"></script>
+
+@code {
+  private string indexLoginEmail = string.Empty;
+  private string indexLoginPassword = string.Empty;
+  private string? indexLoginMessage;
+  private bool indexLoginBusy;
+
+  private async Task HandleIndexLoginAsync()
+  {
+    indexLoginMessage = null;
+
+    if (string.IsNullOrWhiteSpace(indexLoginEmail) || string.IsNullOrWhiteSpace(indexLoginPassword))
+    {
+      indexLoginMessage = "Please enter your email and password.";
+      return;
+    }
+
+    indexLoginBusy = true;
+    try
+    {
+      var request = new LoginRequest { Email = indexLoginEmail, Password = indexLoginPassword };
+      var response = await Http.PostAsJsonAsync("api/auth/login", request);
+
+      AuthResponse? payload = null;
+      var mediaType = response.Content.Headers.ContentType?.MediaType;
+      if (!string.IsNullOrWhiteSpace(mediaType) && mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+      {
+        try { payload = await response.Content.ReadFromJsonAsync<AuthResponse>(); } catch { }
+      }
+
+      if (response.IsSuccessStatusCode && payload?.Success == true)
+      {
+        if (!string.IsNullOrWhiteSpace(payload.Token))
+        {
+          await LocalStorage.SetItemAsync("authToken", payload.Token);
+          Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", payload.Token);
+          await JS.InvokeVoidAsync("kohinoorAuthTouch");
+        }
+
+        Navigation.NavigateTo(
+          string.Equals(payload.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase)
+            ? "/admin-dashboard"
+            : "/products",
+          true);
+        return;
+      }
+
+      indexLoginMessage = payload?.Message ?? "Unable to sign in. Please check your credentials.";
+    }
+    finally
+    {
+      indexLoginBusy = false;
+    }
+  }
+}
+

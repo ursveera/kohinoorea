@@ -1,0 +1,79 @@
+﻿@inherits LayoutComponentBase
+@inject IJSRuntime JS
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<div class="site-shell">
+    <NavMenu />
+    @Body
+</div>
+
+@code {
+    private const int IdleTimeoutMinutes = 30;
+    private PeriodicTimer? _idleTimer;
+    private CancellationTokenSource? _idleCts;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("kohinoorInit");
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _idleCts = new CancellationTokenSource();
+        _idleTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        _ = MonitorIdleTimeoutAsync(_idleCts.Token);
+    }
+
+    private async Task MonitorIdleTimeoutAsync(CancellationToken cancellationToken)
+    {
+        if (_idleTimer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            while (await _idleTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                var token = await LocalStorage.GetItemAsync<string>("authToken");
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    continue;
+                }
+
+                var lastActivityUtc = await JS.InvokeAsync<string?>("kohinoorAuthGetLastActivityUtc");
+                if (!DateTime.TryParse(lastActivityUtc, out var lastActivity))
+                {
+                    continue;
+                }
+
+                if (DateTime.UtcNow - lastActivity.ToUniversalTime() <= TimeSpan.FromMinutes(IdleTimeoutMinutes))
+                {
+                    continue;
+                }
+
+                await LocalStorage.RemoveItemAsync("authToken");
+                await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+                Http.DefaultRequestHeaders.Authorization = null;
+                Navigation.NavigateTo("/", true);
+                return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _idleCts?.Cancel();
+        _idleTimer?.Dispose();
+        _idleCts?.Dispose();
+        await Task.CompletedTask;
+    }
+}

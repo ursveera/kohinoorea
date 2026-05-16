@@ -1,0 +1,193 @@
+@page "/login"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Net.Http.Headers
+@using Blazored.LocalStorage
+
+<PageTitle>Login</PageTitle>
+
+<main>
+    <section class="page-hero">
+      <div class="container">
+        <div class="eyebrow">Client access</div>
+        <h1><span class="gradient-text">Login</span> to your Kohinoor EA portal</h1>
+        <p>Use this page as the entry point for clients who want to access account updates, onboarding notes, downloads, and support resources.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container auth-layout">
+        <div class="panel">
+          <span class="badge">Secure sign in</span>
+          <h2 class="section-title">Client login</h2>
+          <div class="summary-item">
+            <div>
+              <strong>Plan waiting in checkout</strong>
+              <span data-login-plan-description>Designed for traders who want the strongest long-term value, launch-offer support, and a smoother onboarding path.</span>
+            </div>
+            <strong><span data-login-plan-name>Annual Plan</span> <span data-login-plan-price>$299</span></strong>
+          </div>
+          <EditForm class="contact-form" FormName="login-form" Model="loginRequest" OnValidSubmit="HandleLoginAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <InputText type="email" @bind-Value="loginRequest.Email" placeholder="Email address" />
+            <ValidationMessage For="@(() => loginRequest.Email)" />
+            <InputText type="password" @bind-Value="loginRequest.Password" placeholder="Password" />
+            <ValidationMessage For="@(() => loginRequest.Password)" />
+            <label class="checkbox-row"><InputCheckbox @bind-Value="loginRequest.RememberMe" /> Keep me signed in on this device</label>
+            <div class="auth-actions">
+              <button class="button button-primary" type="submit">Login and Open Products</button>
+              <a class="button button-secondary" href="/registration?plan=annual" data-login-register-link>Create Access</a>
+            </div>
+          </EditForm>
+          @if (!string.IsNullOrWhiteSpace(loginStatusMessage))
+          {
+            <p class="summary-caption">@loginStatusMessage</p>
+          }
+          <div class="inline-note">
+            <span class="summary-caption">Forgot your password or need access help?</span>
+            <a href="/contact">Contact support</a>
+          </div>
+        </div>
+        <div class="portal-copy">
+          <div class="hero-card">
+            <span class="badge">Portal use</span>
+            <h3>Client access built for account continuity</h3>
+            <p>This login page gives clients a clear entry point for account access, downloads, onboarding resources, and support visibility.</p>
+            <div class="feature-stack">
+              <div class="auth-note">
+                <strong>Account access</strong>
+                <span>Use for client onboarding, plan status, and updates.</span>
+              </div>
+              <div class="auth-note">
+                <strong>Support continuity</strong>
+                <span>Keep downloads, guidance, and support links in one place.</span>
+              </div>
+              <div class="auth-note">
+                <strong>Secure portal flow</strong>
+                <span>Supports account sign-in, protected resources, and ongoing client continuity.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div><strong>Kohinoor EA</strong></div>
+      <div><p>Client access page for account entry, downloads, and onboarding resources.</p></div>
+    </div>
+  </footer>
+<script src="assets/js/commerce-flow.js"></script>
+
+@code {
+  private readonly LoginRequest loginRequest = new();
+  private string? loginStatusMessage;
+
+  [Inject]
+  private HttpClient Http { get; set; } = default!;
+
+  [Inject]
+  private IJSRuntime JS { get; set; } = default!;
+
+  [Inject]
+  private ILocalStorageService LocalStorage { get; set; } = default!;
+
+  [Inject]
+  private NavigationManager Navigation { get; set; } = default!;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+    if (string.IsNullOrWhiteSpace(token))
+    {
+      return;
+    }
+
+    if (IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+      return;
+    }
+
+    Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    await JS.InvokeVoidAsync("kohinoorAuthTouch");
+
+    var meResponse = await Http.GetAsync("api/auth/me");
+    var mePayload = meResponse.IsSuccessStatusCode
+      ? await meResponse.Content.ReadFromJsonAsync<AuthResponse>()
+      : null;
+
+    Navigation.NavigateTo(
+      string.Equals(mePayload?.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase)
+        ? "/admin-dashboard"
+        : "/products",
+      true);
+  }
+
+  private async Task HandleLoginAsync()
+  {
+    loginStatusMessage = null;
+
+    var response = await Http.PostAsJsonAsync("api/auth/login", loginRequest);
+    AuthResponse? payload = null;
+
+    if (IsJsonResponse(response))
+    {
+      try
+      {
+        payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+      }
+      catch
+      {
+      }
+    }
+
+    if (response.IsSuccessStatusCode && payload?.Success == true)
+    {
+      if (!string.IsNullOrWhiteSpace(payload.Token))
+      {
+        await LocalStorage.SetItemAsync("authToken", payload.Token);
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload.Token);
+        await JS.InvokeVoidAsync("kohinoorAuthTouch");
+      }
+
+      loginStatusMessage = payload.Message;
+      Navigation.NavigateTo(
+        string.Equals(payload.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase)
+          ? "/admin-dashboard"
+          : "/products",
+        true);
+      return;
+    }
+
+    if (!response.IsSuccessStatusCode)
+    {
+      loginStatusMessage = payload?.Message ?? "Unable to sign in right now. Please try again.";
+      return;
+    }
+
+    loginStatusMessage = payload?.Message ?? "Unable to sign in right now. Please try again.";
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token))
+    {
+      return true;
+    }
+
+    var jwt = handler.ReadJwtToken(token);
+    return jwt.ValidTo <= DateTime.UtcNow;
+  }
+
+  private static bool IsJsonResponse(HttpResponseMessage response)
+  {
+    var mediaType = response.Content.Headers.ContentType?.MediaType;
+    return !string.IsNullOrWhiteSpace(mediaType) && mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
+  }
+}

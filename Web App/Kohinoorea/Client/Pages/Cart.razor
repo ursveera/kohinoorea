@@ -1,0 +1,696 @@
+@page "/cart"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Net.Http.Headers
+@using System.Text.RegularExpressions
+@using Kohinoorea.Shared.Models.Commerce
+
+<PageTitle>Cart</PageTitle>
+
+<style>
+  /* ── Theme tokens ─────────────────────────────── */
+  :root, body[data-theme="dark"] {
+    --ct-bg:          linear-gradient(135deg,#060810 0%,#0f1623 55%,#040609 100%);
+    --ct-glow1:       rgba(251,191,36,0.13);
+    --ct-glow2:       rgba(128,90,213,0.13);
+    --ct-text:        #f0f4ff;
+    --ct-muted:       #7b8fa8;
+    --ct-card-bg:     rgba(255,255,255,0.04);
+    --ct-card-border: rgba(255,255,255,0.09);
+    --ct-gold-border: rgba(251,191,36,0.2);
+    --ct-divider:     rgba(255,255,255,0.07);
+    --ct-shimmer:     rgba(255,255,255,0.03);
+    --ct-sec-bg:      rgba(255,255,255,0.05);
+    --ct-sec-border:  rgba(255,255,255,0.12);
+    --ct-sec-text:    #c8d4e8;
+    --ct-err-bg:      rgba(248,113,113,0.1);
+    --ct-err-border:  rgba(248,113,113,0.28);
+    --ct-err-text:    #fca5a5;
+    --ct-empty-bg:    rgba(255,255,255,0.02);
+  }
+  body[data-theme="light"] {
+    --ct-bg:          linear-gradient(135deg,#f0f4ff 0%,#faf6ee 50%,#f5f0ff 100%);
+    --ct-glow1:       rgba(251,191,36,0.22);
+    --ct-glow2:       rgba(128,90,213,0.12);
+    --ct-text:        #111827;
+    --ct-muted:       #6b7280;
+    --ct-card-bg:     rgba(255,255,255,0.78);
+    --ct-card-border: rgba(0,0,0,0.09);
+    --ct-gold-border: rgba(251,191,36,0.38);
+    --ct-divider:     rgba(0,0,0,0.07);
+    --ct-shimmer:     rgba(255,255,255,0.6);
+    --ct-sec-bg:      rgba(0,0,0,0.04);
+    --ct-sec-border:  rgba(0,0,0,0.12);
+    --ct-sec-text:    #374151;
+    --ct-err-bg:      rgba(239,68,68,0.08);
+    --ct-err-border:  rgba(239,68,68,0.25);
+    --ct-err-text:    #dc2626;
+    --ct-empty-bg:    rgba(0,0,0,0.03);
+  }
+
+  /* ── Shell ────────────────────────────────────── */
+  .ct-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 15% 10%, var(--ct-glow1), transparent 38%),
+      radial-gradient(circle at 85% 85%, var(--ct-glow2), transparent 38%),
+      var(--ct-bg);
+    color: var(--ct-text);
+    font-family: "Inter", sans-serif;
+    padding: 14px 24px 28px;
+    transition: background 0.35s, color 0.25s;
+  }
+
+  .ct-container { max-width: 960px; margin: 0 auto; }
+
+  .ct-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--ct-muted); font-size: 13px; font-weight: 600;
+    background: none; border: none; cursor: pointer;
+    padding: 0; margin-bottom: 18px; transition: color 0.2s;
+  }
+  .ct-back:hover { color: var(--ct-text); }
+
+  .ct-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #f59e0b; margin-bottom: 4px;
+  }
+
+  .ct-header-title {
+    font-size: 26px; font-weight: 900; letter-spacing: -0.05em;
+    margin-bottom: 4px; color: var(--ct-text);
+  }
+
+  .ct-header-sub {
+    color: var(--ct-muted); font-size: 13px; margin-bottom: 20px; max-width: 520px;
+  }
+
+  /* ── Progress ─────────────────────────────────── */
+  .ct-progress {
+    display: flex; gap: 6px; align-items: center; margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .ct-progress span {
+    font-size: 11.5px; font-weight: 700; padding: 4px 12px;
+    border-radius: 999px; color: var(--ct-muted);
+    border: 1px solid var(--ct-divider);
+  }
+  .ct-progress span.done {
+    background: rgba(34,197,94,0.1); color: #22c55e;
+    border-color: rgba(34,197,94,0.25);
+  }
+  .ct-progress span.active {
+    background: rgba(251,191,36,0.13); color: #f59e0b;
+    border-color: rgba(251,191,36,0.3);
+  }
+  .ct-progress .ct-progress-sep {
+    color: var(--ct-muted); font-size: 11px; border: none;
+    background: none; padding: 0;
+  }
+
+  /* ── Layout ───────────────────────────────────── */
+  .ct-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 18px;
+    align-items: start;
+  }
+  @@media (max-width: 768px) { .ct-layout { grid-template-columns: 1fr; } }
+
+  /* ── Cart items panel ─────────────────────────── */
+  .ct-items-panel {
+    background: var(--ct-card-bg);
+    border: 1px solid var(--ct-card-border);
+    border-radius: 22px;
+    padding: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12), inset 0 1px 0 var(--ct-shimmer);
+  }
+
+  .ct-panel-title {
+    font-size: 15px; font-weight: 800; letter-spacing: -0.03em;
+    margin-bottom: 16px; color: var(--ct-text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .ct-count-badge {
+    font-size: 10.5px; font-weight: 700; padding: 3px 9px;
+    border-radius: 999px; background: rgba(251,191,36,0.13);
+    color: #f59e0b; border: 1px solid rgba(251,191,36,0.25);
+  }
+
+  /* ── Single cart item ─────────────────────────── */
+  .ct-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: start;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--ct-divider);
+  }
+  .ct-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .ct-item-name {
+    font-size: 14px; font-weight: 700; color: var(--ct-text);
+    margin-bottom: 3px; letter-spacing: -0.02em;
+  }
+
+  .ct-item-desc {
+    font-size: 12px; color: var(--ct-muted); line-height: 1.5;
+    margin-bottom: 8px;
+  }
+
+  .ct-item-features {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;
+  }
+  .ct-item-features span {
+    font-size: 10.5px; font-weight: 600; padding: 2px 9px;
+    border-radius: 999px; background: var(--ct-sec-bg);
+    border: 1px solid var(--ct-sec-border); color: var(--ct-sec-text);
+  }
+
+  .ct-item-qty {
+    display: flex; align-items: center; gap: 8px; margin-top: 4px;
+  }
+  .ct-qty-btn {
+    width: 26px; height: 26px; border-radius: 8px;
+    border: 1px solid var(--ct-sec-border); background: var(--ct-sec-bg);
+    color: var(--ct-text); font-size: 15px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .ct-qty-btn:hover { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.35); }
+  .ct-qty-num { font-size: 13px; font-weight: 700; min-width: 20px; text-align: center; }
+
+  .ct-item-right { text-align: right; }
+  .ct-item-price {
+    font-size: 18px; font-weight: 900;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; letter-spacing: -0.03em; margin-bottom: 8px;
+  }
+  .ct-remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--ct-muted); font-size: 11.5px; font-weight: 600;
+    padding: 3px 0; transition: color 0.2s; display: block; text-align: right;
+  }
+  .ct-remove-btn:hover { color: #f87171; }
+
+  /* ── Empty state ──────────────────────────────── */
+  .ct-empty {
+    background: var(--ct-empty-bg);
+    border: 1px dashed var(--ct-card-border);
+    border-radius: 16px; padding: 40px 24px;
+    text-align: center; color: var(--ct-muted);
+  }
+  .ct-empty-icon { font-size: 38px; margin-bottom: 10px; opacity: 0.5; }
+  .ct-empty h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: var(--ct-text); }
+  .ct-empty p { font-size: 13px; margin-bottom: 16px; }
+
+  /* ── Summary card ─────────────────────────────── */
+  .ct-summary-card {
+    background: var(--ct-card-bg);
+    border: 1px solid var(--ct-gold-border);
+    border-radius: 22px; padding: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 40px rgba(251,191,36,0.07), inset 0 1px 0 var(--ct-shimmer);
+    position: sticky; top: 14px;
+  }
+
+  .ct-summary-title {
+    font-size: 15px; font-weight: 800; letter-spacing: -0.03em;
+    margin-bottom: 4px; color: var(--ct-text);
+  }
+  .ct-summary-sub {
+    font-size: 12px; color: var(--ct-muted); margin-bottom: 16px;
+  }
+
+  .ct-summary-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; border-bottom: 1px solid var(--ct-divider);
+    font-size: 13px;
+  }
+  .ct-summary-line:last-of-type { border-bottom: none; }
+  .ct-summary-line span { color: var(--ct-muted); }
+  .ct-summary-line strong { color: var(--ct-text); font-weight: 700; }
+
+  .ct-total-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 14px 0; padding: 12px 14px;
+    background: linear-gradient(135deg,rgba(251,191,36,0.09),rgba(249,115,22,0.05));
+    border: 1px solid rgba(251,191,36,0.2); border-radius: 14px;
+  }
+  .ct-total-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ct-muted); }
+  .ct-total-value {
+    font-size: 28px; font-weight: 900;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; letter-spacing: -0.04em;
+  }
+
+  .ct-btn-primary {
+    width: 100%; padding: 13px 24px;
+    background: linear-gradient(135deg,#fbbf24,#f97316);
+    border: none; border-radius: 14px; color: #0a0a0a;
+    font-size: 14px; font-weight: 800; cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+    margin-bottom: 8px; letter-spacing: -0.01em;
+    box-shadow: 0 6px 28px rgba(251,191,36,0.35);
+  }
+  .ct-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 38px rgba(251,191,36,0.48);
+    filter: brightness(1.05);
+  }
+  .ct-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ct-btn-secondary {
+    width: 100%; padding: 11px 24px;
+    border: 1px solid var(--ct-sec-border); border-radius: 14px;
+    background: var(--ct-sec-bg); color: var(--ct-sec-text);
+    font-size: 13.5px; font-weight: 700; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    text-align: center; display: block; text-decoration: none;
+  }
+  .ct-btn-secondary:hover {
+    background: rgba(251,191,36,0.07);
+    border-color: rgba(251,191,36,0.3); color: #f59e0b;
+  }
+
+  .ct-notice {
+    padding: 10px 13px; border-radius: 12px;
+    background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.18);
+    font-size: 11.5px; color: #7eb8f7; line-height: 1.6; margin-top: 10px;
+  }
+
+  .ct-status {
+    padding: 11px 14px; border-radius: 12px;
+    font-size: 13px; font-weight: 600; margin-top: 10px; text-align: center;
+  }
+  .ct-status.error {
+    background: var(--ct-err-bg); border: 1px solid var(--ct-err-border);
+    color: var(--ct-err-text);
+  }
+  .ct-status.success {
+    background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25);
+    color: #22c55e;
+  }
+
+  .ct-clear-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 11.5px; color: var(--ct-muted); font-weight: 600;
+    padding: 0; transition: color 0.2s; margin-top: 6px; display: block;
+    text-align: center; width: 100%;
+  }
+  .ct-clear-btn:hover { color: #f87171; }
+
+  /* ── Success view ─────────────────────────────── */
+  .ct-success-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(34,197,94,0.08), transparent 45%),
+      var(--ct-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Inter", sans-serif;
+    padding: 48px 24px;
+    transition: background 0.35s;
+  }
+  .ct-success-card {
+    max-width: 560px;
+    width: 100%;
+    background: var(--ct-card-bg);
+    border: 1px solid rgba(34,197,94,0.22);
+    border-radius: 26px;
+    padding: 42px 34px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 40px rgba(34,197,94,0.08), 0 2px 12px rgba(0,0,0,0.1);
+  }
+  .ct-success-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.08));
+    border: 2px solid rgba(34,197,94,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 30px;
+    color: #16a34a;
+    box-shadow: 0 0 30px rgba(34,197,94,0.15);
+  }
+  .ct-success-title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    margin-bottom: 10px;
+    color: var(--ct-text);
+  }
+  .ct-success-text {
+    color: var(--ct-muted);
+    font-size: 17px;
+    line-height: 1.55;
+    margin-bottom: 20px;
+  }
+  .ct-order-pill {
+    display: inline-block;
+    padding: 9px 20px;
+    border-radius: 999px;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.28);
+    color: #16a34a;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    letter-spacing: 0.02em;
+  }
+  .ct-order-list {
+    list-style: none;
+    margin: 0 0 24px;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .ct-order-list li {
+    font-size: 13px;
+    color: var(--ct-sec-text);
+    background: var(--ct-sec-bg);
+    border: 1px solid var(--ct-sec-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+</style>
+
+@if (orderSuccess)
+{
+  <div class="ct-success-shell">
+    <div class="ct-success-card">
+      <div class="ct-success-icon">✓</div>
+      <h2 class="ct-success-title">Order Confirmed!</h2>
+      <p class="ct-success-text">Your cart order has been placed successfully. Check your dashboard for order status and activation details.</p>
+      @if (createdOrderIds.Count == 1)
+      {
+        <div class="ct-order-pill">Order ID: ORD-@createdOrderIds[0]</div>
+      }
+      else if (createdOrderIds.Count > 1)
+      {
+        <div class="ct-order-pill">@createdOrderIds.Count orders created</div>
+        <ul class="ct-order-list">
+          @foreach (var orderId in createdOrderIds)
+          {
+            <li>Order ID: ORD-@orderId</li>
+          }
+        </ul>
+      }
+
+      <a class="ct-btn-primary" style="display:block; text-decoration:none; text-align:center;" href="/dashboard#orders">Go to Dashboard</a>
+      <a class="ct-btn-secondary" style="margin-top:12px;" href="/dashboard#products">Browse More Products</a>
+    </div>
+  </div>
+}
+else
+{
+<div class="ct-shell">
+  <div class="ct-container">
+    <button class="ct-back" type="button" @onclick="GoBack">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </button>
+
+    <div class="ct-eyebrow">Secure Review</div>
+    <h1 class="ct-header-title">
+      Your <span style="background:linear-gradient(90deg,#fbbf24,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Cart</span>
+    </h1>
+    <p class="ct-header-sub">Review your selected products, adjust quantities, and proceed to checkout.</p>
+
+    <div class="ct-progress">
+      <span class="done">Product</span>
+      <span class="ct-progress-sep">›</span>
+      <span class="active">Cart</span>
+      <span class="ct-progress-sep">›</span>
+      <span>Checkout</span>
+      <span class="ct-progress-sep">›</span>
+      <span>Activation</span>
+    </div>
+
+    <div class="ct-layout">
+      <!-- Items panel -->
+      <div class="ct-items-panel">
+        <div class="ct-panel-title">
+          Cart Items
+          @if (cartItems.Count > 0)
+          {
+            <span class="ct-count-badge">@cartItems.Count item@(cartItems.Count != 1 ? "s" : "")</span>
+          }
+        </div>
+
+        @if (cartItems.Count == 0)
+        {
+          <div class="ct-empty">
+            <div class="ct-empty-icon">🛒</div>
+            <h3>Your cart is empty</h3>
+            <p>Browse our products and add a plan to get started.</p>
+            <a class="ct-btn-secondary" href="/dashboard#products">View Products</a>
+          </div>
+        }
+        else
+        {
+          @foreach (var item in cartItems)
+          {
+            var raw = item.Description ?? string.Empty;
+            var summaryMatch = System.Text.RegularExpressions.Regex.Match(raw, @"<p>(.*?)</p>", System.Text.RegularExpressions.RegexOptions.Singleline);
+            var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
+            var features = System.Text.RegularExpressions.Regex.Matches(raw, @"<span>(.*?)</span>", System.Text.RegularExpressions.RegexOptions.Singleline)
+                               .Select(m => m.Groups[1].Value.Trim())
+                               .Where(f => f.Length > 0)
+                               .ToList();
+            <div class="ct-item">
+              <div>
+                <div class="ct-item-name">@item.Name</div>
+                @if (!string.IsNullOrEmpty(summary))
+                {
+                  <div class="ct-item-desc">@summary</div>
+                }
+                @if (features.Count > 0)
+                {
+                  <div class="ct-item-features">
+                    @foreach (var f in features)
+                    {
+                      <span>@f</span>
+                    }
+                  </div>
+                }
+                <div class="ct-item-qty">
+                  <button class="ct-qty-btn" type="button" @onclick="() => DecreaseQty(item.ProductId)" title="Decrease">−</button>
+                  <span class="ct-qty-num">@item.Quantity</span>
+                  <button class="ct-qty-btn" type="button" @onclick="() => IncreaseQty(item.ProductId)" title="Increase">+</button>
+                </div>
+              </div>
+              <div class="ct-item-right">
+                <div class="ct-item-price">₹@((item.UnitPrice * item.Quantity).ToString("N0"))</div>
+                <button class="ct-remove-btn" type="button" @onclick="() => RemoveItem(item.ProductId)">Remove</button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Summary card -->
+      <div class="ct-summary-card">
+        <div class="ct-summary-title">Order Summary</div>
+        <div class="ct-summary-sub">Review totals before checkout.</div>
+
+        @foreach (var item in cartItems)
+        {
+          <div class="ct-summary-line">
+            <span>@item.Name × @item.Quantity</span>
+            <strong>₹@((item.UnitPrice * item.Quantity).ToString("N0"))</strong>
+          </div>
+        }
+
+        <div class="ct-total-row">
+          <div>
+            <div class="ct-total-label">Total</div>
+          </div>
+          <div class="ct-total-value">₹@TotalPrice.ToString("N0")</div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+          <div class="ct-status @statusClass">@statusMessage</div>
+        }
+
+        @if (cartItems.Count > 0)
+        {
+          <button class="ct-btn-primary" type="button" @onclick="ProceedToCheckoutAsync" disabled="@isSubmitting">
+            @(isSubmitting ? "Processing..." : $"Buy {cartItems.Count} Item{(cartItems.Count == 1 ? string.Empty : "s")}")
+          </button>
+        }
+        else
+        {
+          <button class="ct-btn-primary" type="button" disabled>
+            Cart is empty
+          </button>
+        }
+
+        <a class="ct-btn-secondary" href="/dashboard#products" style="margin-top:8px;">Browse More Products</a>
+
+        @if (cartItems.Count > 0)
+        {
+          <button class="ct-clear-btn" type="button" @onclick="ClearCart">Clear cart</button>
+        }
+
+        <div class="ct-notice" style="margin-top:10px;">
+          🔒 Your cart is saved locally in your browser session.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+@code {
+  private sealed class CartItem
+  {
+    public long ProductId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal UnitPrice { get; set; }
+    public int Quantity { get; set; } = 1;
+  }
+
+  private List<CartItem> cartItems = new();
+  private readonly List<long> createdOrderIds = new();
+  private string? statusMessage;
+  private string statusClass = string.Empty;
+  private bool isSubmitting;
+  private bool orderSuccess;
+
+  private decimal TotalPrice => cartItems.Sum(i => i.UnitPrice * i.Quantity);
+
+  private const string CartKey = "kohinoor_cart";
+
+  protected override async Task OnInitializedAsync()
+  {
+    var saved = await LocalStorage.GetItemAsync<List<CartItem>>(CartKey);
+    if (saved is not null)
+      cartItems = saved;
+  }
+
+  private async Task SaveCart()
+  {
+    await LocalStorage.SetItemAsync(CartKey, cartItems);
+  }
+
+  private async Task IncreaseQty(long productId)
+  {
+    var item = cartItems.FirstOrDefault(i => i.ProductId == productId);
+    if (item is not null) { item.Quantity++; await SaveCart(); }
+  }
+
+  private async Task DecreaseQty(long productId)
+  {
+    var item = cartItems.FirstOrDefault(i => i.ProductId == productId);
+    if (item is null) return;
+    if (item.Quantity <= 1)
+      await RemoveItem(productId);
+    else { item.Quantity--; await SaveCart(); }
+  }
+
+  private async Task RemoveItem(long productId)
+  {
+    cartItems.RemoveAll(i => i.ProductId == productId);
+    await SaveCart();
+    statusMessage = null;
+  }
+
+  private async Task ClearCart()
+  {
+    cartItems.Clear();
+    await LocalStorage.RemoveItemAsync(CartKey);
+    statusMessage = null;
+  }
+
+  private async Task ProceedToCheckoutAsync()
+  {
+    if (cartItems.Count == 0 || isSubmitting)
+      return;
+
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+      Navigation.NavigateTo("/login", true);
+      return;
+    }
+
+    isSubmitting = true;
+    statusMessage = null;
+    Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    try
+    {
+      createdOrderIds.Clear();
+
+      foreach (var item in cartItems)
+      {
+        var response = await Http.PostAsJsonAsync("api/commerce/orders", new CreateOrderRequest
+        {
+          ProductId = item.ProductId,
+          Quantity = item.Quantity
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+          statusClass = "error";
+          statusMessage = $"Unable to process {item.Name}. Please try again.";
+          return;
+        }
+
+        var created = await response.Content.ReadFromJsonAsync<OrderResultDto>();
+        if (created is not null)
+        {
+          createdOrderIds.Add(created.OrderId);
+        }
+      }
+
+      cartItems.Clear();
+      await LocalStorage.RemoveItemAsync(CartKey);
+      statusClass = string.Empty;
+      statusMessage = null;
+      orderSuccess = true;
+    }
+    finally
+    {
+      isSubmitting = false;
+    }
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token))
+    {
+      return true;
+    }
+
+    var jwt = handler.ReadJwtToken(token);
+    return jwt.ValidTo <= DateTime.UtcNow;
+  }
+
+  private void GoBack() => Navigation.NavigateTo("/dashboard#products");
+}
+
+
+

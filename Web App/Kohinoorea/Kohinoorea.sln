@@ -1,0 +1,65 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11723.189 insiders
+MinimumVisualStudioVersion = 16.0.0.0
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kohinoorea.Server", "Server\Kohinoorea.Server.csproj", "{65948F08-F41E-46EC-BD2B-B6D190293FC0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kohinoorea.Client", "Client\Kohinoorea.Client.csproj", "{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kohinoorea.Shared", "Shared\Kohinoorea.Shared.csproj", "{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|x64.Build.0 = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Debug|x86.Build.0 = Debug|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|x64.ActiveCfg = Release|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|x64.Build.0 = Release|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|x86.ActiveCfg = Release|Any CPU
+		{65948F08-F41E-46EC-BD2B-B6D190293FC0}.Release|x86.Build.0 = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|x64.Build.0 = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Debug|x86.Build.0 = Debug|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|x64.ActiveCfg = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|x64.Build.0 = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|x86.ActiveCfg = Release|Any CPU
+		{41E11851-C5A6-4DC4-BFCB-F66925D9F4CC}.Release|x86.Build.0 = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|x64.Build.0 = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Debug|x86.Build.0 = Debug|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|x64.ActiveCfg = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|x64.Build.0 = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|x86.ActiveCfg = Release|Any CPU
+		{FB0DA7AD-5442-4E84-BF6A-0F2081AB4304}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {272B01EE-B29D-462E-A29B-1F162DB22335}
+	EndGlobalSection
+EndGlobal

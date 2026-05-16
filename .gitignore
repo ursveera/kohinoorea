@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/Web App/Kohinoorea/.vs
+/Web App/Kohinoorea/Client/bin
+/Web App/Kohinoorea/Client/obj
+/Web App/Kohinoorea/Server/bin
+/Web App/Kohinoorea/Server/obj

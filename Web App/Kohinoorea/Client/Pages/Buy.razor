@@ -1,0 +1,195 @@
+@page "/buy"
+@using System.Net.Http.Headers
+@using System.IdentityModel.Tokens.Jwt
+
+<PageTitle>Buy</PageTitle>
+
+<main>
+    <section class="section">
+      <div class="container">
+        <div class="eyebrow">Purchase request</div>
+        <h1 class="section-title">Complete your <span class="gradient-text">Kohinoor EA</span> purchase request</h1>
+        <p class="section-copy">Fill in your details and choose the plan you want, then continue with the purchase-support flow.</p>
+      </div>
+      <div class="container portal-layout">
+        <div class="panel">
+          <span class="badge">Checkout details</span>
+          <h2 class="section-title buy-section-title">Submit your purchase request</h2>
+          <div class="notice-box buy-checkout-notice">
+            <span class="mini-label">Instant checkout</span>
+            <p>Use the Stripe checkout button for direct payment, or keep the email request route if you want manual support before purchase.</p>
+          </div>
+          <form class="contact-form">
+            <div class="form-split">
+              <input type="text" name="full-name" @bind="buyerName" placeholder="Full name">
+              <input type="email" name="email" @bind="buyerEmail" placeholder="Email address">
+            </div>
+            <div class="form-split">
+              <input type="text" name="country" @bind="buyerCountry" placeholder="Country">
+              <input type="text" name="broker" @bind="buyerBroker" placeholder="Broker / account type">
+            </div>
+            <fieldset class="plan-picker">
+              <legend>Select your plan</legend>
+              <label class="plan-option">
+                <input type="radio" name="plan" value="monthly" checked="@(selectedPlan == "monthly")" @onclick="SelectMonthly">
+                <span class="plan-option-text">
+                  <strong>Monthly Plan</strong>
+                  <span>$99 - Lower-commitment access with full setup support.</span>
+                </span>
+              </label>
+              <label class="plan-option plan-option-featured">
+                <input type="radio" name="plan" value="annual" checked="@(selectedPlan == "annual")" @onclick="SelectAnnual">
+                <span class="plan-option-text">
+                  <strong>Annual Plan</strong>
+                  <span>$299 - Saving $150, 33.33% off, plus 15% extra off with LAUNCH26.</span>
+                </span>
+              </label>
+              <label class="plan-option">
+                <input type="radio" name="plan" value="lifetime" checked="@(selectedPlan == "lifetime")" @onclick="SelectLifetime">
+                <span class="plan-option-text">
+                  <strong>Lifetime Plan (4 Years)</strong>
+                  <span>$799 - Saving $364, 31.25% off, with LAUNCH26 launch-offer support.</span>
+                </span>
+              </label>
+            </fieldset>
+            <textarea name="notes" @bind="buyerNotes" placeholder="Add anything the team should know before activation"></textarea>
+            <div class="buy-actions">
+              <a class="button button-primary buy-primary-action" href="#" target="_blank" rel="noopener noreferrer" data-buy-stripe-link>Purchase Now with Stripe</a>
+              <div class="buy-secondary-actions">
+                <button class="button button-secondary" type="button" @onclick="HandleBuySubmitAsync" disabled="@buySubmitting">@(buySubmitting ? "Placing Order..." : "Submit Purchase Request")</button>
+                <a class="button button-secondary" href="/cart?plan=annual" data-buy-cart-link>Review Cart</a>
+              </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(buyStatusMessage))
+            {
+              <p class="fine-print" style="color:@(buyOrderSuccess ? "#86efac" : "#fca5a5");">@buyStatusMessage</p>
+            }
+            <p class="fine-print" data-buy-stripe-note>Stripe checkout opens in a secure hosted payment page for the selected plan.</p>
+          </form>
+        </div>
+        <div class="panel">
+          <span class="badge">Purchase flow</span>
+          <h2 class="section-title buy-section-title">What happens next</h2>
+          <div class="checkout-steps">
+            <div class="step-card">
+              <strong>1. Request received</strong>
+              <span>The team reviews your selected plan and account details.</span>
+            </div>
+            <div class="step-card">
+              <strong>2. Confirmation and support</strong>
+              <span>You receive the next onboarding and purchase guidance steps.</span>
+            </div>
+            <div class="step-card">
+              <strong>3. Activation path</strong>
+              <span>Setup and client support continue after plan confirmation.</span>
+            </div>
+          </div>
+          <div class="notice-box">
+            <span class="mini-label">Launch offer</span>
+            <p>Promo code <strong>LAUNCH26</strong> can still be referenced during your purchase discussion for eligible plans.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container panel">
+        <div class="eyebrow">Buy page summary</div>
+        <h2 class="section-title">Direct purchase step</h2>
+        <p>Use this page as the direct purchase step for collecting buyer details, selected plan, and onboarding information in a clean purchase flow.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div><strong>Kohinoor EA</strong></div>
+      <div><p>Buy page for direct purchase collection and checkout progression.</p></div>
+    </div>
+  </footer>
+<script src="assets/js/commerce-flow.js"></script>
+
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+
+@code {
+  private string selectedPlan = "annual";
+
+  private void SelectMonthly() => selectedPlan = "monthly";
+  private void SelectAnnual() => selectedPlan = "annual";
+  private void SelectLifetime() => selectedPlan = "lifetime";
+  private string buyerName = string.Empty;
+  private string buyerEmail = string.Empty;
+  private string buyerCountry = string.Empty;
+  private string buyerBroker = string.Empty;
+  private string buyerNotes = string.Empty;
+  private string? buyStatusMessage;
+  private bool buySubmitting;
+  private bool buyOrderSuccess;
+
+  private async Task HandleBuySubmitAsync()
+  {
+    buyStatusMessage = null;
+    buySubmitting = true;
+    buyOrderSuccess = false;
+
+    try
+    {
+      var token = await LocalStorage.GetItemAsync<string>("authToken");
+
+      if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+      {
+        buyStatusMessage = "Please log in to place an order. Your email request has been noted.";
+        return;
+      }
+
+      Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+      var allProducts = await Http.GetAsync("api/commerce/products?all=true");
+      if (!allProducts.IsSuccessStatusCode)
+      {
+        buyStatusMessage = "Unable to reach the product catalogue. Your email request has been noted.";
+        return;
+      }
+
+      var products = await allProducts.Content.ReadFromJsonAsync<List<ProductDto>>();
+      var match = products?.FirstOrDefault(p =>
+        p.Name.Contains(selectedPlan, StringComparison.OrdinalIgnoreCase));
+
+      if (match is null)
+      {
+        buyStatusMessage = "Plan not found in catalogue. Your email request has been noted.";
+        return;
+      }
+
+      var response = await Http.PostAsJsonAsync("api/commerce/orders", new CreateOrderRequest
+      {
+        ProductId = match.Id,
+        Quantity = 1
+      });
+
+      if (!response.IsSuccessStatusCode)
+      {
+        buyStatusMessage = "Order could not be recorded. Please try again.";
+        return;
+      }
+
+      var order = await response.Content.ReadFromJsonAsync<OrderResultDto>();
+      buyOrderSuccess = true;
+      buyStatusMessage = $"Order recorded successfully! Order ID: ORD-{order?.OrderId}. Check your dashboard for status.";
+    }
+    finally
+    {
+      buySubmitting = false;
+    }
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token)) return true;
+    return handler.ReadJwtToken(token).ValidTo <= DateTime.UtcNow;
+  }
+}
+

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kohinoor EA</title>
+    <base href="/" />
+    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="assets/css/styles.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="Kohinoorea.Client.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <div id="app-loading-overlay">
+            <div class="loading-backdrop"></div>
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="brand-mark-loader">K</div>
+            </div>
+            <p class="loading-text">Loading Kohinoor EA...</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="assets/js/theme-switch.js"></script>
+    <script src="assets/js/home-hero-stack.js"></script>
+    <script src="assets/js/commerce-flow.js"></script>
+    <script src="assets/js/app-init.js"></script>
+    <script src="assets/js/auth-tabs.js"></script>
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+
+    <script>
+        (function () {
+            function hideOverlay() {
+                var overlay = document.getElementById('app-loading-overlay');
+                if (overlay) {
+                    overlay.style.transition = 'opacity 0.5s ease';
+                    overlay.style.opacity = '0';
+                    setTimeout(function () { overlay.remove(); }, 500);
+                }
+            }
+
+            if (window['__kohinoorBlazorStartRequested']) {
+                hideOverlay();
+                return;
+            }
+
+            window['__kohinoorBlazorStartRequested'] = true;
+            window['Blazor'].start()
+                .then(hideOverlay)
+                .catch(function () {
+                    hideOverlay();
+                });
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,143 @@
+@page "/products"
+@using System.IdentityModel.Tokens.Jwt
+@using System.Net.Http.Headers
+@using System.Text.RegularExpressions
+
+<PageTitle>Products</PageTitle>
+
+<main>
+  <section class="products-hero">
+    <div class="container products-hero-shell">
+      <div>
+        <span class="badge">Client product desk</span>
+        <h1>Select the Kohinoor product you want to activate.</h1>
+        <p>Choose a plan and add it to your cart items.</p>
+      </div>
+      <aside class="products-flow-card">
+        <span class="mini-label">Logged-in flow</span>
+        <strong>Products -> Cart Items -> Checkout</strong>
+        <p>@statusMessage</p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container product-grid">
+      @foreach (var product in products)
+      {
+        var prodRaw = product.Description ?? string.Empty;
+        var prodSummaryMatch = Regex.Match(prodRaw, @"<p>(.*?)</p>", RegexOptions.Singleline);
+        var prodSummary = prodSummaryMatch.Success ? prodSummaryMatch.Groups[1].Value.Trim() : "Premium Kohinoor EA product for MT4 automated trading.";
+        var prodFeatures = Regex.Matches(prodRaw, @"<span>(.*?)</span>", RegexOptions.Singleline)
+                               .Select(m => m.Groups[1].Value.Trim())
+                               .Where(f => f.Length > 0)
+                               .ToList();
+        if (prodFeatures.Count == 0)
+          prodFeatures = new List<string> { "MT4 compatible setup", "XAUUSD focused workflow", "Support after purchase" };
+        <article class="product-card @(product.Name.Contains("Annual", StringComparison.OrdinalIgnoreCase) ? "featured-product" : string.Empty)">
+          <div class="product-card-top">
+            <span class="mini-label">Entry access</span>
+            <strong>$@product.Price</strong>
+          </div>
+          <h2>@product.Name</h2>
+          <p>@prodSummary</p>
+          <ul class="product-feature-list">
+            @foreach (var feat in prodFeatures)
+            {
+              <li>@feat</li>
+            }
+          </ul>
+          <button class="button button-primary" type="button" @onclick="() => AddToCartAsync(product)">Add @product.Name to Cart</button>
+        </article>
+      }
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div><strong>Kohinoor EA</strong></div>
+    <div><p>Product selection desk for logged-in clients before cart review.</p></div>
+  </div>
+</footer>
+
+@code {
+  private readonly List<ProductDto> products = new();
+  private string statusMessage = "Choose a product and add to cart.";
+
+  [Inject]
+  private HttpClient Http { get; set; } = default!;
+
+  [Inject]
+  private ILocalStorageService LocalStorage { get; set; } = default!;
+
+  [Inject]
+  private NavigationManager Navigation { get; set; } = default!;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var response = await Http.GetAsync("api/commerce/products");
+    if (!response.IsSuccessStatusCode)
+    {
+      statusMessage = "Unable to load products.";
+      return;
+    }
+
+    var payload = await response.Content.ReadFromJsonAsync<List<ProductDto>>();
+    products.Clear();
+    products.AddRange(payload ?? Enumerable.Empty<ProductDto>());
+  }
+
+  private sealed class CartItem
+  {
+    public long ProductId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal UnitPrice { get; set; }
+    public int Quantity { get; set; } = 1;
+  }
+
+  private const string CartKey = "kohinoor_cart";
+
+  private async Task AddToCartAsync(ProductDto product)
+  {
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      await LocalStorage.RemoveItemAsync("authToken");
+      await LocalStorage.RemoveItemAsync("authLastActivityUtc");
+      Http.DefaultRequestHeaders.Authorization = null;
+
+      var name = product.Name.ToLowerInvariant();
+      var planKey = name.Contains("monthly") ? "monthly"
+          : name.Contains("lifetime") ? "lifetime"
+          : "annual";
+
+      Navigation.NavigateTo($"/registration?plan={Uri.EscapeDataString(planKey)}", true);
+      return;
+    }
+
+    var cart = await LocalStorage.GetItemAsync<List<CartItem>>(CartKey) ?? new List<CartItem>();
+    var existing = cart.FirstOrDefault(i => i.ProductId == product.Id);
+    if (existing is not null)
+      existing.Quantity++;
+    else
+      cart.Add(new CartItem { ProductId = product.Id, Name = product.Name, Description = product.Description, UnitPrice = product.Price, Quantity = 1 });
+
+    await LocalStorage.SetItemAsync(CartKey, cart);
+    Navigation.NavigateTo("/cart", true);
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token))
+    {
+      return true;
+    }
+
+    var jwt = handler.ReadJwtToken(token);
+    return jwt.ValidTo <= DateTime.UtcNow;
+  }
+}

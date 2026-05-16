@@ -1,0 +1,94 @@
+<header class="site-header">
+    <div class="container nav-bar">
+        <NavLink class="brand" href="" Match="NavLinkMatch.All">
+            <div class="brand-mark">K</div>
+            <div class="brand-text">
+                <strong>Kohinoor EA</strong>
+                <span>High Precision Forex Trading Automation</span>
+            </div>
+        </NavLink>
+
+        <nav class="nav-links mobile-bottom-nav" aria-label="Primary navigation">
+            <NavLink href="" Match="NavLinkMatch.All">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z" /></svg>
+                <span>Home</span>
+            </NavLink>
+            <NavLink href="about">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17h.01M12 13a4 4 0 1 0-4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /></svg>
+                <span>About</span>
+            </NavLink>
+            <NavLink href="features">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m13 3-9 11h7l-1 7 10-12h-7l1-6Z" /></svg>
+                <span>Features</span>
+            </NavLink>
+            <NavLink href="performance">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19V5m0 14h16M8 16v-5m4 5V8m4 8v-7" /></svg>
+                <span>Results</span>
+            </NavLink>
+            <NavLink class="nav-pricing-link" href="pricing">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18m4-14.5A4 4 0 0 0 12.5 5H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-2.5A4 4 0 0 1 8 15.5" /></svg>
+                <span>Pricing</span>
+            </NavLink>
+            <NavLink href="faq">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9a2.5 2.5 0 1 1 4.1 1.9c-.9.7-1.6 1.2-1.6 2.6m0 3.5h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /></svg>
+                <span>FAQ</span>
+            </NavLink>
+            <NavLink href="contact">
+                <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Zm2.5.5 5.5 4 5.5-4" /></svg>
+                <span>Contact</span>
+            </NavLink>
+            @if (isAuthenticated)
+            {
+                <NavLink href="dashboard">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M7 6h1m8 0h1M7 18h1m8 0h1" /></svg>
+                    <span>Dashboard</span>
+                </NavLink>
+            }
+            @if (isAdmin)
+            {
+                <NavLink href="admin-dashboard">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4m8 0a4 4 0 0 0-4-4m0 0V4m0 16v-4" /></svg>
+                    <span>Admin</span>
+                </NavLink>
+            }
+            <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">Light Theme</button>
+        </nav>
+    </div>
+</header>
+
+@code {
+    private bool isAuthenticated;
+    private bool isAdmin;
+
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var meResponse = await Http.GetAsync("api/auth/me");
+            if (!meResponse.IsSuccessStatusCode || !IsJsonResponse(meResponse))
+            {
+                isAuthenticated = false;
+                isAdmin = false;
+                return;
+            }
+
+            var me = await meResponse.Content.ReadFromJsonAsync<AuthResponse>();
+            isAuthenticated = me?.Success == true;
+            isAdmin = string.Equals(me?.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            isAuthenticated = false;
+            isAdmin = false;
+        }
+    }
+
+    private static bool IsJsonResponse(HttpResponseMessage response)
+    {
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        return !string.IsNullOrWhiteSpace(mediaType) && mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
+    }
+}
