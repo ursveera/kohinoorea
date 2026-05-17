@@ -17,12 +17,38 @@ public sealed class AuthController : ControllerBase
     private readonly IAuthRepository _authRepository;
     private readonly IPasswordHasher<string> _passwordHasher;
     private readonly IConfiguration _configuration;
+    private readonly IEmailOtpService _emailOtpService;
 
-    public AuthController(IAuthRepository authRepository, IPasswordHasher<string> passwordHasher, IConfiguration configuration)
+    public AuthController(IAuthRepository authRepository, IPasswordHasher<string> passwordHasher, IConfiguration configuration, IEmailOtpService emailOtpService)
     {
         _authRepository = authRepository;
         _passwordHasher = passwordHasher;
         _configuration = configuration;
+        _emailOtpService = emailOtpService;
+    }
+
+    [HttpPost("email-otp/send")]
+    public async Task<ActionResult<AuthResponse>> SendEmailOtp([FromBody] EmailOtpRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "Invalid email request." });
+        }
+
+        var (success, message) = await _emailOtpService.SendOtpAsync(request.Email, cancellationToken);
+        return Ok(new AuthResponse { Success = success, Message = message, Email = request.Email.Trim().ToLowerInvariant() });
+    }
+
+    [HttpPost("email-otp/verify")]
+    public async Task<ActionResult<AuthResponse>> VerifyEmailOtp([FromBody] EmailOtpVerifyRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "Invalid OTP request." });
+        }
+
+        var (success, message) = await _emailOtpService.VerifyOtpAsync(request.Email, request.Otp, cancellationToken);
+        return Ok(new AuthResponse { Success = success, Message = message, Email = request.Email.Trim().ToLowerInvariant() });
     }
 
     [HttpPost("signup")]
@@ -47,9 +73,20 @@ public sealed class AuthController : ControllerBase
             });
         }
 
+        var isEmailVerified = await _emailOtpService.IsEmailVerifiedAsync(request.Email, cancellationToken);
+        if (!isEmailVerified)
+        {
+            return BadRequest(new AuthResponse
+            {
+                Success = false,
+                Message = "Please verify your email before signing up."
+            });
+        }
+
         var passwordHash = _passwordHasher.HashPassword(request.Email, request.Password);
         var userId = await _authRepository.CreateUserAsync(request, passwordHash, cancellationToken);
         await _authRepository.CreateSignupSubmissionAsync(request, cancellationToken);
+        await _emailOtpService.ClearVerifiedEmailAsync(request.Email, cancellationToken);
 
         return Ok(new AuthResponse
         {

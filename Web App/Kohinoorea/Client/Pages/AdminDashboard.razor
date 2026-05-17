@@ -2,6 +2,7 @@
 @implements IDisposable
 @using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Components.Forms
+@using Kohinoorea.Client.Services
 
 <PageTitle>Kohinoorea Admin Dashboard</PageTitle>
 <PremiumConfirmModal
@@ -1325,13 +1326,13 @@
               <p class="helper-text">Use Add p/Add span to create fields, then click Insert Description to build one HTML description string.</p>
               <div class="description-preview">
                 <h5>Beautified Preview</h5>
-                <p class="description-preview-summary">@GetDescriptionSummary(createProduct.Description)</p>
+                <p class="description-preview-summary">@adminCurrency.ReplacePricesInTextFromUsd(GetDescriptionSummary(createProduct.Description))</p>
                 @if (GetDescriptionTagValues(createProduct.Description, "span").Count > 0)
                 {
                   <div class="description-preview-features">
                     @foreach (var feature in GetDescriptionTagValues(createProduct.Description, "span"))
                     {
-                      <span class="description-preview-feature">@feature</span>
+                      <span class="description-preview-feature">@adminCurrency.ReplacePricesInTextFromUsd(feature)</span>
                     }
                   </div>
                 }
@@ -1340,7 +1341,7 @@
                   <div class="description-preview-notes">
                     @foreach (var note in GetDescriptionTagValues(createProduct.Description, "i"))
                     {
-                      <p class="description-preview-note">@note</p>
+                      <p class="description-preview-note">@adminCurrency.ReplacePricesInTextFromUsd(note)</p>
                     }
                   </div>
                 }
@@ -1421,7 +1422,7 @@
                       }
                     </div>
                     <div class="product-price">
-                      <span class="price">$@product.Price.ToString("N0")</span>
+                      <span class="price">@adminCurrency.FormatFromUsd(product.Price)</span>
                     </div>
                     <div class="product-tags">
                       <span class="tag">@(product.IsActive ? "Active" : "Hidden")</span>
@@ -1488,7 +1489,7 @@
                     <td>@row.UserFullName</td>
                     <td>@row.UserEmail</td>
                     <td>@row.Quantity</td>
-                    <td>$@row.TotalAmount.ToString("N0")</td>
+                    <td>@adminCurrency.FormatFromUsd(row.TotalAmount)</td>
                     <td>@row.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td>
                     <td>
                       <div class="order-actions">
@@ -1669,6 +1670,7 @@ else
 </div>
 
 @code {
+  private readonly CurrencyContext adminCurrency = CurrencyContext.FromCountryCode("US");
     private enum AdminSection
     {
         Products,

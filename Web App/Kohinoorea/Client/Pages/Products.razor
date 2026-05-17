@@ -2,6 +2,7 @@
 @using System.IdentityModel.Tokens.Jwt
 @using System.Net.Http.Headers
 @using System.Text.RegularExpressions
+@using Kohinoorea.Client.Services
 
 <PageTitle>Products</PageTitle>
 
@@ -27,9 +28,11 @@
       {
         var prodRaw = product.Description ?? string.Empty;
         var prodSummaryMatch = Regex.Match(prodRaw, @"<p>(.*?)</p>", RegexOptions.Singleline);
-        var prodSummary = prodSummaryMatch.Success ? prodSummaryMatch.Groups[1].Value.Trim() : "Premium Kohinoor EA product for MT4 automated trading.";
+        var prodSummary = prodSummaryMatch.Success
+          ? currency.ReplacePricesInTextFromUsd(prodSummaryMatch.Groups[1].Value.Trim())
+          : "Premium Kohinoor EA product for MT4 automated trading.";
         var prodFeatures = Regex.Matches(prodRaw, @"<span>(.*?)</span>", RegexOptions.Singleline)
-                               .Select(m => m.Groups[1].Value.Trim())
+                               .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
                                .Where(f => f.Length > 0)
                                .ToList();
         if (prodFeatures.Count == 0)
@@ -37,7 +40,7 @@
         <article class="product-card @(product.Name.Contains("Annual", StringComparison.OrdinalIgnoreCase) ? "featured-product" : string.Empty)">
           <div class="product-card-top">
             <span class="mini-label">Entry access</span>
-            <strong>$@product.Price</strong>
+            <strong>@currency.FormatFromUsd(product.Price)</strong>
           </div>
           <h2>@product.Name</h2>
           <p>@prodSummary</p>
@@ -64,6 +67,7 @@
 @code {
   private readonly List<ProductDto> products = new();
   private string statusMessage = "Choose a product and add to cart.";
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   [Inject]
   private HttpClient Http { get; set; } = default!;
@@ -76,6 +80,8 @@
 
   protected override async Task OnInitializedAsync()
   {
+    currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+
     var response = await Http.GetAsync("api/commerce/products");
     if (!response.IsSuccessStatusCode)
     {

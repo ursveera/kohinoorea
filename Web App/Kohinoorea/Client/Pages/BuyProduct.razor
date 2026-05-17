@@ -504,9 +504,11 @@ else
             @{
               var raw = product.Description ?? string.Empty;
               var summaryMatch = Regex.Match(raw, @"<p>(.*?)</p>", RegexOptions.Singleline);
-              var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : "Premium Kohinoor EA product for MT4 automated trading on XAUUSD.";
+              var summary = summaryMatch.Success
+                ? currency.ReplacePricesInTextFromUsd(summaryMatch.Groups[1].Value.Trim())
+                : "Premium Kohinoor EA product for MT4 automated trading on XAUUSD.";
               var features = Regex.Matches(raw, @"<span>(.*?)</span>", RegexOptions.Singleline)
-                                  .Select(m => m.Groups[1].Value.Trim())
+                                  .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
                                   .Where(f => f.Length > 0)
                                   .ToList();
               if (features.Count == 0)
@@ -524,7 +526,7 @@ else
             <div class="bp-price-block">
               <div>
                 <div class="bp-price-label">Product Price</div>
-                <div class="bp-price-value">₹@product.Price.ToString("N0")</div>
+                <div class="bp-price-value">@currency.FormatFromUsd(product.Price)</div>
               </div>
               <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#fbbf24" opacity="0.5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
@@ -555,7 +557,7 @@ else
 
             <div class="bp-total-row">
               <span class="bp-total-label">Total</span>
-              <span class="bp-total-price">₹@product.Price.ToString("N0")</span>
+              <span class="bp-total-price">@currency.FormatFromUsd(product.Price)</span>
             </div>
 
             <button class="bp-btn-primary" type="button" @onclick="BuyNowAsync" disabled="@buying">
@@ -582,6 +584,7 @@ else
 @inject HttpClient Http
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager Navigation
+@using Kohinoorea.Client.Services
 
 @code {
   [Parameter]
@@ -594,9 +597,12 @@ else
   private bool buying;
   private bool orderSuccess;
   private long? createdOrderId;
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   protected override async Task OnInitializedAsync()
   {
+    currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+
     var token = await LocalStorage.GetItemAsync<string>("authToken");
     if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
     {

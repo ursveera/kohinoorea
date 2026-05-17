@@ -1,5 +1,9 @@
 @page "/faq"
 
+@using Kohinoorea.Client.Services
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+
 <PageTitle>Faq</PageTitle>
 
 <main>
@@ -39,7 +43,7 @@
         </article>
         <article class="faq-item">
           <h3>What pricing plans are available?</h3>
-          <p>Kohinoor EA is available in flexible plans to suit different needs: Monthly ($99), Annual ($299), and Lifetime - 4 Years ($799).</p>
+          <p>Kohinoor EA is available in flexible plans to suit different needs: Monthly (@currency.FormatFromUsd(99m)), Annual (@currency.FormatFromUsd(299m)), and Lifetime - 4 Years (@currency.FormatFromUsd(799m)).</p>
         </article>
         <article class="faq-item">
           <h3>Do you provide support after purchase?</h3>
@@ -83,3 +87,11 @@
   </footer>
 
 
+@code {
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
+
+  protected override async Task OnInitializedAsync()
+  {
+    currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+  }
+}

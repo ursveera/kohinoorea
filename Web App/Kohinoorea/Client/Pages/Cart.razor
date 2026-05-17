@@ -464,9 +464,9 @@ else
           {
             var raw = item.Description ?? string.Empty;
             var summaryMatch = System.Text.RegularExpressions.Regex.Match(raw, @"<p>(.*?)</p>", System.Text.RegularExpressions.RegexOptions.Singleline);
-            var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
+            var summary = summaryMatch.Success ? currency.ReplacePricesInTextFromUsd(summaryMatch.Groups[1].Value.Trim()) : string.Empty;
             var features = System.Text.RegularExpressions.Regex.Matches(raw, @"<span>(.*?)</span>", System.Text.RegularExpressions.RegexOptions.Singleline)
-                               .Select(m => m.Groups[1].Value.Trim())
+                               .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
                                .Where(f => f.Length > 0)
                                .ToList();
             <div class="ct-item">
@@ -492,7 +492,7 @@ else
                 </div>
               </div>
               <div class="ct-item-right">
-                <div class="ct-item-price">₹@((item.UnitPrice * item.Quantity).ToString("N0"))</div>
+                <div class="ct-item-price">@currency.FormatFromUsd(item.UnitPrice * item.Quantity)</div>
                 <button class="ct-remove-btn" type="button" @onclick="() => RemoveItem(item.ProductId)">Remove</button>
               </div>
             </div>
@@ -509,7 +509,7 @@ else
         {
           <div class="ct-summary-line">
             <span>@item.Name × @item.Quantity</span>
-            <strong>₹@((item.UnitPrice * item.Quantity).ToString("N0"))</strong>
+            <strong>@currency.FormatFromUsd(item.UnitPrice * item.Quantity)</strong>
           </div>
         }
 
@@ -517,7 +517,7 @@ else
           <div>
             <div class="ct-total-label">Total</div>
           </div>
-          <div class="ct-total-value">₹@TotalPrice.ToString("N0")</div>
+          <div class="ct-total-value">@currency.FormatFromUsd(TotalPrice)</div>
         </div>
 
         @if (!string.IsNullOrEmpty(statusMessage))
@@ -557,6 +557,7 @@ else
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager Navigation
 @inject HttpClient Http
+@using Kohinoorea.Client.Services
 
 @code {
   private sealed class CartItem
@@ -574,6 +575,7 @@ else
   private string statusClass = string.Empty;
   private bool isSubmitting;
   private bool orderSuccess;
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   private decimal TotalPrice => cartItems.Sum(i => i.UnitPrice * i.Quantity);
 
@@ -581,6 +583,7 @@ else
 
   protected override async Task OnInitializedAsync()
   {
+    currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
     var saved = await LocalStorage.GetItemAsync<List<CartItem>>(CartKey);
     if (saved is not null)
       cartItems = saved;
@@ -691,6 +694,4 @@ else
 
   private void GoBack() => Navigation.NavigateTo("/dashboard#products");
 }
-
-
 

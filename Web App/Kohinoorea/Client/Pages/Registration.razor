@@ -3,207 +3,445 @@
 <PageTitle>Registration</PageTitle>
 
 <main>
-  <section class="registration-hero">
-    <div class="container registration-premium-shell">
-      <div class="registration-copy">
-        <span class="badge">Request Access</span>
-        <h1>Start your Kohinoor EA onboarding.</h1>
-        <p>Kohinoor EA is a premium MT4 Expert Advisor for traders who want automated XAUUSD execution, advanced risk controls, and guided setup before going live.</p>
+    <section class="registration-hero">
+        <div class="container registration-premium-shell">
+            <div class="registration-copy">
+                <span class="badge">Request Access</span>
+                <h1>Start your Kohinoor EA onboarding.</h1>
+                <p>Kohinoor EA is a premium MT4 Expert Advisor for traders who want automated XAUUSD execution, advanced risk controls, and guided setup before going live.</p>
 
-        <div class="registration-proof-row">
-          <div class="registration-proof">
-            <strong>MT4</strong>
-            <span>Platform ready</span>
-          </div>
-          <div class="registration-proof">
-            <strong>XAUUSD</strong>
-            <span>Gold focused</span>
-          </div>
-          <div class="registration-proof">
-            <strong>24/5</strong>
-            <span>VPS friendly</span>
-          </div>
+                <div class="registration-proof-row">
+                    <div class="registration-proof">
+                        <strong>MT4</strong>
+                        <span>Platform ready</span>
+                    </div>
+                    <div class="registration-proof">
+                        <strong>XAUUSD</strong>
+                        <span>Gold focused</span>
+                    </div>
+                    <div class="registration-proof">
+                        <strong>24/5</strong>
+                        <span>VPS friendly</span>
+                    </div>
+                </div>
+
+                <div class="registration-steps">
+                    <article>
+                        <span>01</span>
+                        <strong>Choose your access path</strong>
+                        <p>Select demo, monthly, annual, or lifetime access.</p>
+                    </article>
+                    <article>
+                        <span>02</span>
+                        <strong>Share your MT4 details</strong>
+                        <p>Tell us your broker, account type, and preferred risk approach.</p>
+                    </article>
+                    <article>
+                        <span>03</span>
+                        <strong>Get onboarding support</strong>
+                        <p>Receive setup guidance before continuing to client access.</p>
+                    </article>
+                </div>
+            </div>
+
+            <div class="registration-request-panel">
+                <div class="registration-panel-head">
+                    <span class="eyebrow">Launch offer</span>
+                    <h2>Claim your access</h2>
+                    <p>Special introductory pricing is available for new clients before rates increase.</p>
+                </div>
+
+                <EditForm class="contact-form registration-premium-form" FormName="registration-form" Model="signupRequest" OnValidSubmit="HandleSignupAsync">
+                    <InputRadioGroup @bind-Value="signupRequest.AccessPlan" Name="access-plan" class="access-plan-grid" aria-label="Access options">
+                        <label class="access-plan-card">
+                            <InputRadio Value="@("demo")" />
+                            <span>
+                                <strong>Demo / Trial</strong>
+                                <small>Request guided evaluation</small>
+                            </span>
+                        </label>
+                        <label class="access-plan-card featured">
+                            <InputRadio Value="@("annual")" />
+                            <span>
+                                <strong>Annual Plan</strong>
+                                <small>Launch code LAUNCH26</small>
+                            </span>
+                        </label>
+                        <label class="access-plan-card">
+                            <InputRadio Value="@("lifetime")" />
+                            <span>
+                                <strong>Lifetime 4 Years</strong>
+                                <small>Best long-term value</small>
+                            </span>
+                        </label>
+                    </InputRadioGroup>
+
+                    <ValidationMessage For="@(() => signupRequest.AccessPlan)" />
+                    <DataAnnotationsValidator />
+
+                    <InputText @bind-Value="signupRequest.FullName" placeholder="Full name" />
+                    <ValidationMessage For="@(() => signupRequest.FullName)" />
+
+
+                    <div class="email-verify-row">
+                        <input type="email"
+                               value="@signupRequest.Email"
+                               @oninput="OnEmailInputChanged"
+                               placeholder="Email address"
+                               disabled="@(isSendingOtp || isVerifyingOtp || isSubmitting)" />
+                        <button type="button" class="button button-ghost mini-verify-button" @onclick="SendEmailOtpAsync" disabled="@(!CanSendEmailOtp)">
+                            @if (isSendingOtp)
+                            {
+                                <span class="mini-spinner" aria-hidden="true"></span>
+                            }
+                            <span>@SendOtpButtonText</span>
+                        </button>
+                    </div>
+                    <ValidationMessage For="@(() => signupRequest.Email)" />
+                    @if (ShowEmailOtpStatus)
+                    {
+                        <p class="summary-caption">@emailOtpStatusMessage</p>
+                    }
+                    @if (showOtpEntry)
+                    {
+                        <div class="otp-flow-panel">
+                            <div class="otp-row">
+                                <input class="@OtpInputCssClass"
+                                       type="text"
+                                       value="@emailOtpCode"
+                                       @oninput="OnOtpInputChanged"
+                                       placeholder="Enter 6-digit OTP"
+                                       maxlength="6"
+                                       inputmode="numeric"
+                                       autocomplete="one-time-code"
+                                       disabled="@(isVerifyingOtp || isSubmitting || isEmailVerified)" />
+                                <button type="button" class="button button-ghost mini-verify-button" @onclick="VerifyEmailOtpAsync" disabled="@(!CanVerifyEmailOtp)">
+                                    @if (isVerifyingOtp)
+                                    {
+                                        <span class="mini-spinner" aria-hidden="true"></span>
+                                    }
+                                    <span>@VerifyOtpButtonText</span>
+                                </button>
+                                @if (isEmailVerified)
+                                {
+                                    <span class="otp-success-icon" aria-label="Email verified">&#10003;</span>
+                                }
+                            </div>
+                            @if (ShowOtpStatus)
+                            {
+                                <div class="@OtpStatusCssClass">
+                                    @if (isVerifyingOtp)
+                                    {
+                                        <span class="mini-spinner" aria-hidden="true"></span>
+                                    }
+                                    else if (isEmailVerified)
+                                    {
+                                        <span class="otp-status-check" aria-hidden="true">&#10003;</span>
+                                    }
+                                    <span>@emailOtpStatusMessage</span>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <ValidationMessage For="@(() => signupRequest.Phone)" />
+
+                    <InputText type="password" @bind-Value="signupRequest.Password" placeholder="Password" />
+                    <ValidationMessage For="@(() => signupRequest.Password)" />
+
+                    <InputTextArea @bind-Value="signupRequest.Notes" placeholder="Tell us your preferred plan, account size, and setup questions" />
+                    <ValidationMessage For="@(() => signupRequest.Notes)" />
+
+                    <button class="button button-primary" type="submit" disabled="@(!CanSubmitSignup)">@(isSubmitting ? "Creating account..." : isEmailVerified ? "Request Onboarding" : "Verify Email to Continue")</button>
+                    @if (isSubmitting)
+                    {
+                        <p class="summary-caption">Saving your registration details. Please wait...</p>
+                    }
+                    else if (!isEmailVerified)
+                    {
+                        <p class="summary-caption">Enter the OTP sent to your email to enable signup.</p>
+                    }
+                </EditForm>
+                @if (!string.IsNullOrWhiteSpace(signupStatusMessage))
+                {
+                    <p class="summary-caption">@signupStatusMessage</p>
+                }
+
+                <div class="registration-assurance">
+                    <span>Support after request</span>
+                    <strong>Setup guidance, plan selection, and onboarding help included.</strong>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <div class="registration-steps">
-          <article>
-            <span>01</span>
-            <strong>Choose your access path</strong>
-            <p>Select demo, monthly, annual, or lifetime access.</p>
-          </article>
-          <article>
-            <span>02</span>
-            <strong>Share your MT4 details</strong>
-            <p>Tell us your broker, account type, and preferred risk approach.</p>
-          </article>
-          <article>
-            <span>03</span>
-            <strong>Get onboarding support</strong>
-            <p>Receive setup guidance before continuing to client access.</p>
-          </article>
+    <section class="section">
+        <div class="container registration-value-grid">
+            <article class="panel">
+                <span class="badge">Built for</span>
+                <h2 class="section-title">Traders who want structure</h2>
+                <p>Ideal for MT4 users who want disciplined execution without watching charts all day.</p>
+            </article>
+            <article class="panel">
+                <span class="badge">XAUUSD focus</span>
+                <h2 class="section-title">Made for gold movement</h2>
+                <p>The workflow is positioned around structured automation for traders focused on gold opportunities.</p>
+            </article>
+            <article class="panel">
+                <span class="badge">Risk control</span>
+                <h2 class="section-title">Adjustable preferences</h2>
+                <p>Users can share their risk approach and account context before setup support begins.</p>
+            </article>
         </div>
-      </div>
-
-      <div class="registration-request-panel">
-        <div class="registration-panel-head">
-          <span class="eyebrow">Launch offer</span>
-          <h2>Claim your access</h2>
-          <p>Special introductory pricing is available for new clients before rates increase.</p>
-        </div>
-
-        <EditForm class="contact-form registration-premium-form" FormName="registration-form" Model="signupRequest" OnValidSubmit="HandleSignupAsync">
-          <InputRadioGroup @bind-Value="signupRequest.AccessPlan" Name="access-plan" class="access-plan-grid" aria-label="Access options">
-            <label class="access-plan-card">
-              <InputRadio Value="@("demo")" />
-              <span>
-                <strong>Demo / Trial</strong>
-                <small>Request guided evaluation</small>
-              </span>
-            </label>
-            <label class="access-plan-card featured">
-              <InputRadio Value="@("annual")" />
-              <span>
-                <strong>Annual Plan</strong>
-                <small>Launch code LAUNCH26</small>
-              </span>
-            </label>
-            <label class="access-plan-card">
-              <InputRadio Value="@("lifetime")" />
-              <span>
-                <strong>Lifetime 4 Years</strong>
-                <small>Best long-term value</small>
-              </span>
-            </label>
-          </InputRadioGroup>
-          <ValidationMessage For="@(() => signupRequest.AccessPlan)" />
-          <DataAnnotationsValidator />
-          <ValidationSummary />
-          <div class="form-split">
-            <InputText @bind-Value="signupRequest.FullName" placeholder="Full name" />
-            <InputText type="email" @bind-Value="signupRequest.Email" placeholder="Email address" />
-          </div>
-          <ValidationMessage For="@(() => signupRequest.FullName)" />
-          <ValidationMessage For="@(() => signupRequest.Email)" />
-          <div class="form-split">
-            <InputText @bind-Value="signupRequest.Phone" placeholder="WhatsApp number" />
-            <InputSelect @bind-Value="signupRequest.Mt4Broker">
-              <option value="">Select broker / account type</option>
-              <option value="ICMarkets">IC Markets</option>
-              <option value="Exness">Exness</option>
-              <option value="Pepperstone">Pepperstone</option>
-              <option value="XM">XM</option>
-              <option value="RoboForex">RoboForex</option>
-              <option value="Other">Other</option>
-            </InputSelect>
-          </div>
-          <ValidationMessage For="@(() => signupRequest.Phone)" />
-          <ValidationMessage For="@(() => signupRequest.Mt4Broker)" />
-          <InputText type="password" @bind-Value="signupRequest.Password" placeholder="Password" />
-          <ValidationMessage For="@(() => signupRequest.Password)" />
-          <InputTextArea @bind-Value="signupRequest.Notes" placeholder="Tell us your preferred plan, account size, and setup questions" />
-          <ValidationMessage For="@(() => signupRequest.Notes)" />
-          <button class="button button-primary" type="submit" disabled="@isSubmitting">@(isSubmitting ? "Creating account..." : "Request Onboarding")</button>
-          @if (isSubmitting)
-          {
-            <p class="summary-caption">Saving your registration details. Please wait...</p>
-          }
-        </EditForm>
-        @if (!string.IsNullOrWhiteSpace(signupStatusMessage))
-        {
-          <p class="summary-caption">@signupStatusMessage</p>
-        }
-
-        <div class="registration-assurance">
-          <span>Support after request</span>
-          <strong>Setup guidance, plan selection, and onboarding help included.</strong>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container registration-value-grid">
-      <article class="panel">
-        <span class="badge">Built for</span>
-        <h2 class="section-title">Traders who want structure</h2>
-        <p>Ideal for MT4 users who want disciplined execution without watching charts all day.</p>
-      </article>
-      <article class="panel">
-        <span class="badge">XAUUSD focus</span>
-        <h2 class="section-title">Made for gold movement</h2>
-        <p>The workflow is positioned around structured automation for traders focused on gold opportunities.</p>
-      </article>
-      <article class="panel">
-        <span class="badge">Risk control</span>
-        <h2 class="section-title">Adjustable preferences</h2>
-        <p>Users can share their risk approach and account context before setup support begins.</p>
-      </article>
-    </div>
-  </section>
+    </section>
 </main>
 
 <footer class="site-footer">
-  <div class="container footer-grid">
-    <div><strong>Kohinoor EA</strong></div>
-    <div><p>Premium MT4 automation for demo requests, access plans, and onboarding support.</p></div>
-  </div>
+    <div class="container footer-grid">
+        <div><strong>Kohinoor EA</strong></div>
+        <div><p>Premium MT4 automation for demo requests, access plans, and onboarding support.</p></div>
+    </div>
 </footer>
 
 @code {
-  private readonly SignupRequest signupRequest = new();
-  private string? signupStatusMessage;
-  private bool isSubmitting;
+    private readonly SignupRequest signupRequest = new();
+    private string? signupStatusMessage;
+    private string? emailOtpStatusMessage;
+    private string emailOtpCode = string.Empty;
+    private bool isSubmitting;
+    private bool isSendingOtp;
+    private bool isVerifyingOtp;
+    private bool isEmailVerified;
+    private bool showOtpEntry;
 
-  [Inject]
-  private HttpClient Http { get; set; } = default!;
+    [Inject]
+    private HttpClient Http { get; set; } = default!;
 
-  [Inject]
-  private NavigationManager Navigation { get; set; } = default!;
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
 
-  private async Task HandleSignupAsync()
-  {
-    signupStatusMessage = null;
-    isSubmitting = true;
+    private bool CanSendEmailOtp => !isSubmitting && !isSendingOtp && !isVerifyingOtp && !string.IsNullOrWhiteSpace(signupRequest.Email);
 
-    try
+    private bool CanVerifyEmailOtp => !isSubmitting && !isSendingOtp && !isVerifyingOtp && !isEmailVerified && showOtpEntry && emailOtpCode.Length == 6 && !string.IsNullOrWhiteSpace(signupRequest.Email);
+
+    private bool CanSubmitSignup => !isSubmitting && isEmailVerified;
+
+    private bool ShowEmailOtpStatus => !showOtpEntry && !string.IsNullOrWhiteSpace(emailOtpStatusMessage);
+
+    private bool ShowOtpStatus => showOtpEntry && !string.IsNullOrWhiteSpace(emailOtpStatusMessage);
+
+    private string SendOtpButtonText => showOtpEntry && !isEmailVerified ? "Resend OTP" : isEmailVerified ? "Verified" : "Send OTP";
+
+    private string VerifyOtpButtonText => isEmailVerified ? "Verified" : "Confirm OTP";
+
+    private string OtpInputCssClass => isEmailVerified ? "otp-input otp-input-success" : "otp-input";
+
+    private string OtpStatusCssClass => isEmailVerified ? "otp-status otp-status-success" : "otp-status";
+
+    private async Task HandleSignupAsync()
     {
-      var response = await Http.PostAsJsonAsync("api/auth/signup", signupRequest);
-      AuthResponse? payload = null;
+        signupStatusMessage = null;
 
-      if (IsJsonResponse(response))
-      {
+        if (!isEmailVerified)
+        {
+            signupStatusMessage = "Please verify your email before continuing.";
+            return;
+        }
+
+        isSubmitting = true;
+
         try
         {
-          payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+            var response = await Http.PostAsJsonAsync("api/auth/signup", signupRequest);
+            AuthResponse? payload = null;
+
+            if (IsJsonResponse(response))
+            {
+                try
+                {
+                    payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                }
+                catch
+                {
+                }
+            }
+
+            if (response.IsSuccessStatusCode && payload?.Success == true)
+            {
+                Navigation.NavigateTo($"/login?plan={Uri.EscapeDataString(signupRequest.AccessPlan)}", true);
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                signupStatusMessage = payload?.Message ?? "Unable to complete signup right now. Please try again.";
+                return;
+            }
+
+            signupStatusMessage = payload?.Message ?? "Unable to complete signup right now. Please try again.";
         }
-        catch
+        finally
         {
+            isSubmitting = false;
         }
-      }
-
-      if (response.IsSuccessStatusCode && payload?.Success == true)
-      {
-        Navigation.NavigateTo($"/login?plan={Uri.EscapeDataString(signupRequest.AccessPlan)}", true);
-        return;
-      }
-
-      if (!response.IsSuccessStatusCode)
-      {
-        signupStatusMessage = payload?.Message ?? "Unable to complete signup right now. Please try again.";
-        return;
-      }
-
-      signupStatusMessage = payload?.Message ?? "Unable to complete signup right now. Please try again.";
     }
-    finally
+
+    private async Task SendEmailOtpAsync()
     {
-      isSubmitting = false;
-    }
-  }
+        signupStatusMessage = null;
 
-  private static bool IsJsonResponse(HttpResponseMessage response)
-  {
-    var mediaType = response.Content.Headers.ContentType?.MediaType;
-    return !string.IsNullOrWhiteSpace(mediaType) && mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
-  }
+        var email = signupRequest.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            emailOtpStatusMessage = "Please enter an email address first.";
+            showOtpEntry = false;
+            return;
+        }
+
+        if (isSendingOtp)
+        {
+            return;
+        }
+
+        signupRequest.Email = email;
+        emailOtpCode = string.Empty;
+        emailOtpStatusMessage = "Sending verification code...";
+        isEmailVerified = false;
+        showOtpEntry = false;
+        isSendingOtp = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/email-otp/send", new Kohinoorea.Shared.Models.Auth.EmailOtpRequest { Email = email });
+            AuthResponse? payload = null;
+
+            if (IsJsonResponse(response))
+            {
+                try
+                {
+                    payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                }
+                catch
+                {
+                }
+            }
+
+            var otpSent = response.IsSuccessStatusCode && payload?.Success == true;
+            showOtpEntry = otpSent;
+            emailOtpStatusMessage = payload?.Message
+                ?? (otpSent ? "OTP sent to your email." : "Unable to send OTP. Please try again.");
+        }
+        finally
+        {
+            isSendingOtp = false;
+        }
+    }
+
+    private async Task VerifyEmailOtpAsync()
+    {
+        signupStatusMessage = null;
+
+        var email = signupRequest.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            emailOtpStatusMessage = "Please enter an email address first.";
+            showOtpEntry = false;
+            return;
+        }
+
+        if (emailOtpCode.Length != 6)
+        {
+            emailOtpStatusMessage = "Please enter the 6-digit OTP.";
+            return;
+        }
+
+        if (isVerifyingOtp)
+        {
+            return;
+        }
+
+        signupRequest.Email = email;
+        isVerifyingOtp = true;
+        emailOtpStatusMessage = "Verifying OTP...";
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/email-otp/verify", new Kohinoorea.Shared.Models.Auth.EmailOtpVerifyRequest { Email = email, Otp = emailOtpCode });
+            AuthResponse? payload = null;
+
+            if (IsJsonResponse(response))
+            {
+                try
+                {
+                    payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                }
+                catch
+                {
+                }
+            }
+
+            isEmailVerified = response.IsSuccessStatusCode && payload?.Success == true;
+            emailOtpStatusMessage = payload?.Message
+                ?? (isEmailVerified ? "Email verified." : "Unable to verify OTP. Please try again.");
+        }
+        finally
+        {
+            isVerifyingOtp = false;
+        }
+    }
+
+    private void OnOtpInputChanged(ChangeEventArgs args)
+    {
+        emailOtpCode = SanitizeOtp(args.Value?.ToString());
+
+        if (!isEmailVerified && showOtpEntry && emailOtpStatusMessage == "Invalid OTP.")
+        {
+            emailOtpStatusMessage = null;
+        }
+    }
+
+    private void OnEmailInputChanged(ChangeEventArgs args)
+    {
+        signupRequest.Email = args.Value?.ToString() ?? string.Empty;
+        ResetEmailOtpState();
+    }
+
+    private void ResetEmailOtpState()
+    {
+        emailOtpStatusMessage = null;
+        emailOtpCode = string.Empty;
+        isEmailVerified = false;
+        showOtpEntry = false;
+    }
+
+    private static string SanitizeOtp(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var digits = new List<char>(6);
+        foreach (var character in value)
+        {
+            if (!char.IsDigit(character))
+            {
+                continue;
+            }
+
+            digits.Add(character);
+            if (digits.Count == 6)
+            {
+                break;
+            }
+        }
+
+        return new string(digits.ToArray());
+    }
+
+    private static bool IsJsonResponse(HttpResponseMessage response)
+    {
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        return !string.IsNullOrWhiteSpace(mediaType) && mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
+    }
 }

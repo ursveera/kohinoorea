@@ -3,6 +3,9 @@
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@using System.Net.Http.Json
+@using Kohinoorea.Shared.Models.Commerce
+@using Kohinoorea.Client.Services
 
 <PageTitle>Index</PageTitle>
 <main>
@@ -59,18 +62,34 @@
                             </div>
                         </div>
                     </div>
-                    
 
-                    <!-- Starter Product Card (static HTML as requested) -->
-                    <div class="plan-card" style="margin:32px 0 0 0;padding:24px 18px;border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,0.08),rgba(242,202,119,0.08));border:1px solid rgba(242,202,119,0.18);box-shadow:0 8px 32px rgba(0,0,0,0.18);max-width:320px;">
-                        <div class="plan-name" style="font-size:1.1rem;font-weight:800;color:#f8d98b;">Starter</div>
-                        <div class="plan-price" style="margin-top:8px;font-size:1.8rem;font-weight:900;">$29</div>
-                        <div class="plan-promo" style="margin-top:8px;color:rgba(255,255,255,0.7);line-height:1.5;font-size:.95rem;">Best for beginners &amp; small traders</div>
-                        <div class="buy-btn" style="margin-top:18px;">
-                            <button style="width:100%;padding:12px;border:none;border-radius:999px;background:linear-gradient(90deg,#f2ca77,#d97706);color:#1f1400;font-weight:800;cursor:pointer;transition:.25s;">Buy Now</button>
+                    @if (isLoggedIn)
+                    {
+                        <div class="plan-strip" aria-label="Popular plan">
+                            <div class="plan-strip-label">Popular Plan</div>
+                            @if (!string.IsNullOrWhiteSpace(productStatusMessage))
+                            {
+                                <p class="summary-caption" style="margin:0.25rem 0 0.75rem;">@productStatusMessage</p>
+                            }
+                            <div class="plan-marquee">
+                                <div class="plan-track">
+                                    @foreach (var product in MarqueeProducts)
+                                    {
+                                        <div class="plan-card plan-clickable" role="button" tabindex="0" @onclick="() => NavigateToBuyProduct(product.Id)">
+                                            <div class="plan-media">
+                                                <img src="@GetProductImageUrl(product)" alt="@product.Name" loading="lazy" />
+                                                <div class="plan-overlay">
+                                                    <div class="plan-overlay-title">@product.Name</div>
+                                                    <div class="plan-overlay-badge">@FormatUsd(product.Price)</div>
+                                                </div>
+                                            </div>
+                                            <div class="plan-price" aria-hidden="true">@FormatUsd(product.Price)</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
+                    }
                     <!-- ...existing code... -->
                 </div> <!-- close hero-split-left -->
                 <div class="hero-stats-bar">
@@ -167,13 +186,13 @@
                                     <div class="premium-card" style="position:relative;width:100%;max-width:480px;padding:40px 30px;border-radius:32px;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03));backdrop-filter:blur(18px);border:1px solid rgba(242,202,119,0.25);box-shadow:0 25px 80px rgba(0,0,0,0.45),0 0 40px rgba(242,202,119,0.12);">
                                         <button class="logout-btn" @onclick="HandleLogoutAsync" style="position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(242,202,119,0.25);background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.25s;">
                                             <svg width="22" height="22" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#f2ca77;">
-                                                <path d="M17 16l4-4m0 0l-4-4m4 4H7"/>
-                                                <path d="M9 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/>
+                                                <path d="M17 16l4-4m0 0l-4-4m4 4H7" />
+                                                <path d="M9 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4" />
                                             </svg>
                                         </button>
 
                                         <div class="avatar" style="width:84px;height:84px;margin:auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.4rem;font-weight:900;color:#1f1400;background:linear-gradient(135deg,#fff4c6,#f2ca77,#d97706);box-shadow:0 0 30px rgba(242,202,119,0.4);">
-                                            @(!string.IsNullOrWhiteSpace(loggedInUserName) ? loggedInUserName.Substring(0,1).ToUpper() : "T")
+                                            @(!string.IsNullOrWhiteSpace(loggedInUserName) ? loggedInUserName.Substring(0, 1).ToUpper() : "T")
                                         </div>
 
                                         <h1 class="title" style="margin-top:22px;text-align:center;font-size:2rem;font-weight:900;color:#f8d98b;">
@@ -190,28 +209,36 @@
                                         <div class="plans" style="margin-top:42px;">
                                             <div class="plans-title" style="text-align:center;font-size:1.2rem;font-weight:800;color:#f8d98b;margin-bottom:20px;">Choose Your Premium Plan</div>
                                             <div class="plan-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;">
-                                                <div class="plan-card" style="padding:24px 18px;border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,0.08),rgba(242,202,119,0.08));border:1px solid rgba(242,202,119,0.18);transition:.25s;">
-                                                    <div class="plan-name" style="font-size:1.1rem;font-weight:800;color:#f8d98b;">Starter</div>
-                                                    <div class="plan-price" style="margin-top:8px;font-size:1.8rem;font-weight:900;">$29</div>
-                                                    <div class="plan-promo" style="margin-top:8px;color:rgba(255,255,255,0.7);line-height:1.5;font-size:.95rem;">Best for beginners & small traders</div>
-                                                    <div class="buy-btn" style="margin-top:18px;">
-                                                        <button style="width:100%;padding:12px;border:none;border-radius:999px;background:linear-gradient(90deg,#f2ca77,#d97706);color:#1f1400;font-weight:800;cursor:pointer;transition:.25s;">Buy Now</button>
+                                                @if (GridProducts.Count == 0)
+                                                {
+                                                    <div class="plan-card">
+                                                        <div class="plan-name">No products yet</div>
+                                                        <div class="plan-promo">Admin hasn’t posted plans yet.</div>
                                                     </div>
-                                                </div>
-                                                <div class="plan-card" style="padding:24px 18px;border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,0.08),rgba(242,202,119,0.08));border:1px solid rgba(242,202,119,0.18);transition:.25s;">
-                                                    <div class="plan-name" style="font-size:1.1rem;font-weight:800;color:#f8d98b;">Pro</div>
-                                                    <div class="plan-price" style="margin-top:8px;font-size:1.8rem;font-weight:900;">$79</div>
-                                                    <div class="plan-promo" style="margin-top:8px;color:rgba(255,255,255,0.7);line-height:1.5;font-size:.95rem;">Advanced bots & premium analytics</div>
-                                                    <div class="buy-btn" style="margin-top:18px;">
-                                                        <button style="width:100%;padding:12px;border:none;border-radius:999px;background:linear-gradient(90deg,#f2ca77,#d97706);color:#1f1400;font-weight:800;cursor:pointer;transition:.25s;">Buy Now</button>
-                                                    </div>
-                                                </div>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var product in GridProducts)
+                                                    {
+                                                        <div class="plan-card plan-clickable" role="button" tabindex="0" @onclick="() => NavigateToBuyProduct(product.Id)">
+                                                            <div class="plan-media">
+                                                                <img src="@GetProductImageUrl(product)" alt="@product.Name" loading="lazy" />
+                                                                <div class="plan-overlay">
+                                                                    <div class="plan-overlay-title">@product.Name</div>
+                                                                    <div class="plan-overlay-badge">@FormatUsd(product.Price)</div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="plan-price" aria-hidden="true">@FormatUsd(product.Price)</div>
+                                                            <div class="plan-promo">@GetPlanPromo(product)</div>
+                                                        </div>
+                                                    }
+                                                }
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             }
-                        
+
                         </div>
                     </div>
                 </div>
@@ -461,7 +488,97 @@
 
     protected override async Task OnInitializedAsync()
     {
+        currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
         await CheckTokenAndSetStateAsync();
+        await LoadProductsAsync();
+    }
+
+    private readonly List<ProductDto> products = new();
+    private string? productStatusMessage;
+
+    private List<ProductDto> ActiveProducts =>
+        products.Where(p => p.IsActive).OrderBy(p => p.Price).ThenBy(p => p.Name).ToList();
+
+    private List<ProductDto> GridProducts => ActiveProducts.Take(2).ToList();
+
+    private List<ProductDto> MarqueeProducts
+    {
+        get
+        {
+            var active = ActiveProducts;
+            if (active.Count == 0)
+            {
+                return new List<ProductDto>();
+            }
+
+            // Duplicate for smooth -50% marquee travel.
+            return active.Concat(active).ToList();
+        }
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        productStatusMessage = null;
+        products.Clear();
+
+        try
+        {
+            var response = await Http.GetAsync("api/commerce/products");
+            if (!response.IsSuccessStatusCode)
+            {
+                productStatusMessage = "Unable to load products right now.";
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<List<ProductDto>>();
+            products.AddRange(payload ?? Enumerable.Empty<ProductDto>());
+        }
+        catch
+        {
+            productStatusMessage = "Unable to load products right now.";
+        }
+    }
+
+    private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
+
+    private string FormatUsd(decimal price) => currency.FormatFromUsd(price);
+
+    private static string GetPlanPromo(ProductDto product)
+    {
+        var description = product.Description ?? string.Empty;
+        return "Premium access & automation tools";
+    }
+
+    private void NavigateToBuyProduct(long productId)
+    {
+        Navigation.NavigateTo($"/buy-product?productId={productId}", true);
+    }
+
+    private static string GetProductImageUrl(ProductDto product)
+    {
+        if (!string.IsNullOrWhiteSpace(product.ImageLink))
+        {
+            return product.ImageLink.Trim();
+        }
+
+        var name = product.Name?.ToLowerInvariant() ?? string.Empty;
+
+        if (name.Contains("monthly", StringComparison.Ordinal))
+        {
+            return "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80";
+        }
+
+        if (name.Contains("annual", StringComparison.Ordinal))
+        {
+            return "https://images.unsplash.com/photo-1551281044-8b66f0f6c1b0?auto=format&fit=crop&w=800&q=80";
+        }
+
+        if (name.Contains("lifetime", StringComparison.Ordinal))
+        {
+            return "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=800&q=80";
+        }
+
+        return "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=800&q=80";
     }
 
     private async Task CheckTokenAndSetStateAsync()

@@ -23,7 +23,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ClientCors", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5010", "https://localhost:7025", "http://localhost:5008", "https://localhost:7023")
+            .WithOrigins("https://localhost:7023")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -52,6 +52,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddScoped<SqlConnection>(_ =>
     new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -59,6 +60,7 @@ builder.Services.AddScoped<QueryFactory>(sp =>
     new QueryFactory(sp.GetRequiredService<SqlConnection>(), new SqlServerCompiler()));
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ICommerceRepository, CommerceRepository>();
+builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddSingleton<IPasswordHasher<string>, PasswordHasher<string>>();
 
 var app = builder.Build();

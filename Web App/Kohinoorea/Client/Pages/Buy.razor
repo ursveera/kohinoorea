@@ -1,6 +1,7 @@
 @page "/buy"
 @using System.Net.Http.Headers
 @using System.IdentityModel.Tokens.Jwt
+@using Kohinoorea.Client.Services
 
 <PageTitle>Buy</PageTitle>
 
@@ -34,21 +35,21 @@
                 <input type="radio" name="plan" value="monthly" checked="@(selectedPlan == "monthly")" @onclick="SelectMonthly">
                 <span class="plan-option-text">
                   <strong>Monthly Plan</strong>
-                  <span>$99 - Lower-commitment access with full setup support.</span>
+                  <span>@currency.FormatFromUsd(99m) - Lower-commitment access with full setup support.</span>
                 </span>
               </label>
               <label class="plan-option plan-option-featured">
                 <input type="radio" name="plan" value="annual" checked="@(selectedPlan == "annual")" @onclick="SelectAnnual">
                 <span class="plan-option-text">
                   <strong>Annual Plan</strong>
-                  <span>$299 - Saving $150, 33.33% off, plus 15% extra off with LAUNCH26.</span>
+                  <span>@currency.FormatFromUsd(299m) - Saving @currency.FormatFromUsd(150m), 33.33% off, plus 15% extra off with LAUNCH26.</span>
                 </span>
               </label>
               <label class="plan-option">
                 <input type="radio" name="plan" value="lifetime" checked="@(selectedPlan == "lifetime")" @onclick="SelectLifetime">
                 <span class="plan-option-text">
                   <strong>Lifetime Plan (4 Years)</strong>
-                  <span>$799 - Saving $364, 31.25% off, with LAUNCH26 launch-offer support.</span>
+                  <span>@currency.FormatFromUsd(799m) - Saving @currency.FormatFromUsd(364m), 31.25% off, with LAUNCH26 launch-offer support.</span>
                 </span>
               </label>
             </fieldset>
@@ -115,6 +116,12 @@
 
 @code {
   private string selectedPlan = "annual";
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
+
+  protected override async Task OnInitializedAsync()
+  {
+    currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+  }
 
   private void SelectMonthly() => selectedPlan = "monthly";
   private void SelectAnnual() => selectedPlan = "annual";

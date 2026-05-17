@@ -45,6 +45,8 @@ public sealed class AuthRepository : IAuthRepository
     {
         var now = DateTime.UtcNow;
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedPhone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        var normalizedBroker = string.IsNullOrWhiteSpace(request.Mt4Broker) ? null : request.Mt4Broker.Trim();
 
         return await _queryFactory
             .Query(AuthSqlKataSchema.UsersTable)
@@ -52,8 +54,8 @@ public sealed class AuthRepository : IAuthRepository
             {
                 [AuthSqlKataSchema.UserColumns.FullName] = request.FullName.Trim(),
                 [AuthSqlKataSchema.UserColumns.Email] = normalizedEmail,
-                [AuthSqlKataSchema.UserColumns.Phone] = request.Phone.Trim(),
-                [AuthSqlKataSchema.UserColumns.Mt4Broker] = request.Mt4Broker.Trim(),
+                [AuthSqlKataSchema.UserColumns.Phone] = normalizedPhone,
+                [AuthSqlKataSchema.UserColumns.Mt4Broker] = normalizedBroker,
                 [AuthSqlKataSchema.UserColumns.PasswordHash] = passwordHash,
                 [AuthSqlKataSchema.UserColumns.Role] = AuthRoles.User,
                 [AuthSqlKataSchema.UserColumns.IsActive] = true,
@@ -65,6 +67,8 @@ public sealed class AuthRepository : IAuthRepository
     {
         var now = DateTime.UtcNow;
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedPhone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        var normalizedBroker = string.IsNullOrWhiteSpace(request.Mt4Broker) ? null : request.Mt4Broker.Trim();
 
         return await _queryFactory
             .Query(AuthSqlKataSchema.SignupSubmissionsTable)
@@ -72,8 +76,8 @@ public sealed class AuthRepository : IAuthRepository
             {
                 [AuthSqlKataSchema.SignupColumns.FullName] = request.FullName.Trim(),
                 [AuthSqlKataSchema.SignupColumns.Email] = normalizedEmail,
-                [AuthSqlKataSchema.SignupColumns.Phone] = request.Phone.Trim(),
-                [AuthSqlKataSchema.SignupColumns.Mt4Broker] = request.Mt4Broker.Trim(),
+                [AuthSqlKataSchema.SignupColumns.Phone] = normalizedPhone,
+                [AuthSqlKataSchema.SignupColumns.Mt4Broker] = normalizedBroker,
                 [AuthSqlKataSchema.SignupColumns.AccessPlan] = request.AccessPlan,
                 [AuthSqlKataSchema.SignupColumns.Notes] = request.Notes,
                 [AuthSqlKataSchema.SignupColumns.CreatedAtUtc] = now

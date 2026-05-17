@@ -12,14 +12,12 @@ public sealed class SignupRequest
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
-    [Required]
     [Phone]
     [StringLength(30)]
-    public string Phone { get; set; } = string.Empty;
+    public string? Phone { get; set; }
 
-    [Required]
     [StringLength(120)]
-    public string Mt4Broker { get; set; } = string.Empty;
+    public string? Mt4Broker { get; set; }
 
     [Required]
     [MinLength(6)]

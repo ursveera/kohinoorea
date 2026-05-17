@@ -29,9 +29,9 @@
         {
           var raw = plan.Description ?? string.Empty;
           var summaryMatch = Regex.Match(raw, @"<p>(.*?)</p>", RegexOptions.Singleline);
-          var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
+          var summary = summaryMatch.Success ? currency.ReplacePricesInTextFromUsd(summaryMatch.Groups[1].Value.Trim()) : string.Empty;
           var features = Regex.Matches(raw, @"<span>(.*?)</span>", RegexOptions.Singleline)
-                              .Select(m => m.Groups[1].Value.Trim())
+                              .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
                               .Where(f => f.Length > 0)
                               .ToList();
           <article class="pricing-card @(plan.Id == featuredPlanId ? "" : null)">
@@ -46,7 +46,7 @@
               }
             </div>
             <h3>@plan.Name</h3>
-            <div class="price"><strong>₹@plan.Price.ToString("N0")</strong></div>
+            <div class="price"><strong>@currency.FormatFromUsd(plan.Price)</strong></div>
             @if (!string.IsNullOrEmpty(summary))
             {
               <p class="pricing-plan-summary">@summary</p>
@@ -128,34 +128,23 @@
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager Navigation
 @inject HttpClient Http
+@using Kohinoorea.Client.Services
 
 @code {
   private List<ProductDto> pricingPlans = new();
   private bool plansLoading = true;
   private long? featuredPlanId;
-
-  private sealed class IpapiResponse
-  {
-    [System.Text.Json.Serialization.JsonPropertyName("country_code")]
-    public string? CountryCode { get; set; }
-  }
+  private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   protected override async Task OnInitializedAsync()
   {
     try
     {
-      // Detect visitor country — fall back silently if blocked/failed
-      string? detectedCountry = null;
-      try
-      {
-        var geo = await Http.GetFromJsonAsync<IpapiResponse>("https://ipapi.co/json/");
-        detectedCountry = geo?.CountryCode;
-      }
-      catch { /* ignore geo failure, load all plans */ }
+      currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
 
-      var url = string.IsNullOrWhiteSpace(detectedCountry)
+      var url = string.IsNullOrWhiteSpace(currency.CountryCode)
         ? "api/commerce/pricing-plans"
-        : $"api/commerce/pricing-plans?country={Uri.EscapeDataString(detectedCountry)}";
+        : $"api/commerce/pricing-plans?country={Uri.EscapeDataString(currency.CountryCode)}";
 
       var plans = await Http.GetFromJsonAsync<List<ProductDto>>(url);
       pricingPlans = plans ?? new List<ProductDto>();
@@ -223,4 +212,3 @@
     return jwt.ValidTo <= DateTime.UtcNow;
   }
 }
-
