@@ -34,7 +34,7 @@
                               .Select(m => m.Groups[1].Value.Trim())
                               .Where(f => f.Length > 0)
                               .ToList();
-          <article class="pricing-card @(plan.Id == featuredPlanId ? "featured" : null)">
+          <article class="pricing-card @(plan.Id == featuredPlanId ? "" : null)">
             <div class="pricing-card-top">
               @if (plan.Id == featuredPlanId)
               {
