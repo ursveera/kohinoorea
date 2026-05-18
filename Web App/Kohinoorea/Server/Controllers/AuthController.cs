@@ -18,13 +18,15 @@ public sealed class AuthController : ControllerBase
     private readonly IPasswordHasher<string> _passwordHasher;
     private readonly IConfiguration _configuration;
     private readonly IEmailOtpService _emailOtpService;
+    private readonly IEmailDeliveryService _emailDeliveryService;
 
-    public AuthController(IAuthRepository authRepository, IPasswordHasher<string> passwordHasher, IConfiguration configuration, IEmailOtpService emailOtpService)
+    public AuthController(IAuthRepository authRepository, IPasswordHasher<string> passwordHasher, IConfiguration configuration, IEmailOtpService emailOtpService, IEmailDeliveryService emailDeliveryService)
     {
         _authRepository = authRepository;
         _passwordHasher = passwordHasher;
         _configuration = configuration;
         _emailOtpService = emailOtpService;
+        _emailDeliveryService = emailDeliveryService;
     }
 
     [HttpPost("email-otp/send")]
@@ -173,6 +175,58 @@ public sealed class AuthController : ControllerBase
     {
         var users = await _authRepository.GetAdminUsersAsync(cancellationToken);
         return Ok(users);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpGet("follow-up-leads")]
+    public async Task<ActionResult<IReadOnlyList<AdminLeadNotificationDto>>> GetFollowUpLeads(CancellationToken cancellationToken)
+    {
+        var leads = await _authRepository.GetFollowUpCandidatesAsync(cancellationToken);
+        return Ok(leads);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPost("follow-up-leads/{userId:long}/email")]
+    public async Task<ActionResult<AuthResponse>> SendFollowUpLeadEmail([FromRoute] long userId, [FromBody] SendLeadFollowUpEmailRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse
+            {
+                Success = false,
+                Message = "Subject and message are required."
+            });
+        }
+
+        var lead = await _authRepository.GetFollowUpCandidateAsync(userId, cancellationToken);
+        if (lead is null)
+        {
+            return NotFound(new AuthResponse
+            {
+                Success = false,
+                Message = "This user is no longer available for follow-up."
+            });
+        }
+
+        var (success, message) = await _emailDeliveryService.SendPlainTextEmailAsync(lead.Email, request.Subject, request.Message, cancellationToken);
+        if (!success)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new AuthResponse
+            {
+                Success = false,
+                Message = message,
+                Email = lead.Email,
+                UserId = lead.UserId
+            });
+        }
+
+        return Ok(new AuthResponse
+        {
+            Success = true,
+            Message = $"Follow-up email sent to {lead.FullName}.",
+            Email = lead.Email,
+            UserId = lead.UserId
+        });
     }
 
     private string CreateToken(UserAccount user, DateTime expiresAtUtc)

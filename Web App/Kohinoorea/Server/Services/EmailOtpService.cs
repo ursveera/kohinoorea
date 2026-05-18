@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
@@ -14,13 +12,13 @@ public sealed class EmailOtpService : IEmailOtpService
     private const string CachePrefix = "email-otp:";
 
     private readonly IMemoryCache _cache;
-    private readonly IConfiguration _configuration;
+    private readonly IEmailDeliveryService _emailDeliveryService;
     private readonly ILogger<EmailOtpService> _logger;
 
-    public EmailOtpService(IMemoryCache cache, IConfiguration configuration, ILogger<EmailOtpService> logger)
+    public EmailOtpService(IMemoryCache cache, IEmailDeliveryService emailDeliveryService, ILogger<EmailOtpService> logger)
     {
         _cache = cache;
-        _configuration = configuration;
+        _emailDeliveryService = emailDeliveryService;
         _logger = logger;
     }
 
@@ -41,32 +39,22 @@ public sealed class EmailOtpService : IEmailOtpService
         var otp = GenerateOtp();
         var otpHash = HashOtp(otp);
         var verifiedKey = $"{CachePrefix}{normalizedEmail}:verified";
-
-        _cache.Set($"{CachePrefix}{normalizedEmail}:hash", otpHash, OtpLifetime);
-        _cache.Set($"{CachePrefix}{normalizedEmail}:attempts", 0, OtpLifetime);
-        _cache.Set(cooldownKey, true, OtpCooldown);
-        _cache.Remove(verifiedKey);
-
-        var smtpHost = _configuration["Smtp:Host"];
-        var fromAddress = _configuration["Smtp:From"];
-
-        if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(fromAddress))
-        {
-            _logger.LogWarning("SMTP is not configured (missing Smtp:Host or Smtp:From). OTP for {Email} is {Otp}", normalizedEmail, otp);
-            return (false, "Email OTP service is not configured yet. Please contact support.");
-        }
+        var subject = "Kohinoor EA - Email verification OTP";
+        var body = $"Your verification code is: {otp}\n\nThis code expires in 10 minutes.";
 
         try
         {
-            using var client = BuildSmtpClient(smtpHost);
-            using var message = new MailMessage(fromAddress, normalizedEmail)
+            var (success, message) = await _emailDeliveryService.SendPlainTextEmailAsync(normalizedEmail, subject, body, cancellationToken);
+            if (!success)
             {
-                Subject = "Kohinoor EA - Email verification OTP",
-                Body = $"Your verification code is: {otp}\n\nThis code expires in 10 minutes.",
-                IsBodyHtml = false
-            };
+                _logger.LogWarning("OTP email delivery failed for {Email}. Generated OTP was not stored.", normalizedEmail);
+                return (false, message);
+            }
 
-            await client.SendMailAsync(message, cancellationToken);
+            _cache.Set($"{CachePrefix}{normalizedEmail}:hash", otpHash, OtpLifetime);
+            _cache.Set($"{CachePrefix}{normalizedEmail}:attempts", 0, OtpLifetime);
+            _cache.Set(cooldownKey, true, OtpCooldown);
+            _cache.Remove(verifiedKey);
             return (true, "OTP sent to your email.");
         }
         catch (Exception ex)
@@ -154,25 +142,5 @@ public sealed class EmailOtpService : IEmailOtpService
         using var sha = SHA256.Create();
         var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(otp));
         return Convert.ToHexString(bytes);
-    }
-
-    private SmtpClient BuildSmtpClient(string host)
-    {
-        var port = int.TryParse(_configuration["Smtp:Port"], out var parsedPort) ? parsedPort : 587;
-        var enableSsl = !bool.TryParse(_configuration["Smtp:EnableSsl"], out var parsedSsl) || parsedSsl;
-        var username = _configuration["Smtp:Username"];
-        var password = _configuration["Smtp:Password"];
-
-        var client = new SmtpClient(host, port)
-        {
-            EnableSsl = enableSsl
-        };
-
-        if (!string.IsNullOrWhiteSpace(username))
-        {
-            client.Credentials = new NetworkCredential(username, password ?? string.Empty);
-        }
-
-        return client;
     }
 }

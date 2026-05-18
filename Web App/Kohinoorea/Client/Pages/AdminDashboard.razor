@@ -271,7 +271,7 @@
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 20px;
     margin-bottom: 28px;
   }
@@ -379,6 +379,7 @@
   .management-form input,
   .management-form textarea,
   .management-form select,
+  .thread-panel input,
   .thread-panel textarea,
   .thread-panel select,
   .status-select {
@@ -477,7 +478,8 @@
   body[data-theme="dark"] .closed { color: #cbd5e1; }
 
   .product-management-layout,
-  .support-layout {
+  .support-layout,
+  .notification-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
@@ -520,6 +522,7 @@
   .management-form input:focus,
   .management-form textarea:focus,
   .management-form select:focus,
+  .thread-panel input:focus,
   .thread-panel textarea:focus,
   .status-select:focus,
   .filter-box:focus {
@@ -1112,6 +1115,104 @@
     color: var(--d-muted);
   }
 
+  .lead-list {
+    display: grid;
+    gap: 14px;
+    max-height: 74vh;
+    overflow-y: auto;
+    padding-right: 6px;
+    align-content: start;
+  }
+
+  .lead-card {
+    width: 100%;
+    border: 1px solid var(--d-query-border);
+    background: var(--d-query-bg);
+    color: inherit;
+    padding: 18px;
+    border-radius: 20px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+  }
+
+  .lead-card:hover,
+  .lead-card.active {
+    border-color: rgba(251,191,36,0.35);
+    transform: translateY(-2px);
+  }
+
+  .lead-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+
+  .lead-card h4 {
+    margin: 0;
+    color: var(--d-text);
+    font-size: 16px;
+  }
+
+  .lead-card p {
+    margin: 4px 0 0;
+    color: var(--d-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .lead-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .lead-meta-chip,
+  .lead-detail-card {
+    padding: 8px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--d-form-border);
+    background: color-mix(in srgb, var(--d-form-bg) 84%, transparent);
+    color: var(--d-label-text);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .lead-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .lead-detail-card strong {
+    display: block;
+    color: var(--d-text);
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .notification-recipient {
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid var(--d-form-border);
+    background: color-mix(in srgb, var(--d-form-bg) 88%, transparent);
+  }
+
+  .notification-recipient strong {
+    color: var(--d-text);
+    font-size: 16px;
+  }
+
+  .notification-recipient span {
+    color: var(--d-muted);
+    font-size: 13px;
+  }
+
   .toast-container {
     position: fixed;
     right: 28px;
@@ -1165,7 +1266,9 @@
     .cards,
     .product-grid,
     .product-management-layout,
-    .support-layout {
+    .support-layout,
+    .notification-layout,
+    .lead-detail-grid {
       grid-template-columns: 1fr;
     }
 
@@ -1213,6 +1316,7 @@
     <button class="nav-button @(activeSection == AdminSection.Products ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Products)">Products</button>
     <button class="nav-button @(activeSection == AdminSection.Orders ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Orders)">Orders</button>
     <button class="nav-button @(activeSection == AdminSection.Customers ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Customers)">Customers</button>
+    <button class="nav-button @(activeSection == AdminSection.Notifications ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Notifications)">Notifications</button>
     <button class="nav-button @(activeSection == AdminSection.Support ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Support)">Support</button>
 
     <div class="sidebar-card">
@@ -1256,6 +1360,13 @@
         <h3>Customers</h3>
         <p>Load the users table and inspect account activity in one place.</p>
         <div class="stat-number">@customerCount</div>
+      </div>
+
+      <div class="stat-card @(activeSection == AdminSection.Notifications ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Notifications)">
+        <div class="stat-icon">N</div>
+        <h3>Notifications</h3>
+        <p>Follow up with signed-up users who still have no completed purchase.</p>
+        <div class="stat-number">@followUpLeads.Count</div>
       </div>
 
       <div class="stat-card @(activeSection == AdminSection.Support ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Support)">
@@ -1572,6 +1683,105 @@
           </table>
         </div>
       }
+      else if (activeSection == AdminSection.Notifications)
+      {
+        <div class="panel-header">
+          <div>
+            <h3>Follow-up Notifications</h3>
+            <p class="section-intro">Select a signed-up user who still has no completed purchase, then send a follow-up email from the admin dashboard.</p>
+          </div>
+          <span class="badge">Lead Follow-up</span>
+        </div>
+
+        <div class="notification-layout">
+          <div>
+            <input class="filter-box" @bind="followUpLeadFilter" @bind:event="oninput" placeholder="Filter leads by name, email, phone, plan, broker, or order status..." />
+
+            <div class="lead-list">
+              @if (FilteredFollowUpLeads.Count == 0)
+              {
+                <p class="empty-note">No follow-up users are waiting right now.</p>
+              }
+              else
+              {
+                @foreach (var lead in FilteredFollowUpLeads)
+                {
+                  <button class="lead-card @(selectedFollowUpLeadUserId == lead.UserId ? "active" : null)" type="button" @onclick="() => SelectFollowUpLead(lead)">
+                    <div class="lead-card-header">
+                      <div>
+                        <h4>@lead.FullName</h4>
+                        <p>@lead.Email</p>
+                      </div>
+                      <span class="status pending">No purchase</span>
+                    </div>
+
+                    <div class="lead-meta-row">
+                      <span class="lead-meta-chip">@GetLeadPlanLabel(lead.RequestedPlan)</span>
+                      <span class="lead-meta-chip">@GetLeadOrderSummary(lead)</span>
+                      <span class="lead-meta-chip">Joined @lead.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    </div>
+                  </button>
+                }
+              }
+            </div>
+          </div>
+
+          <EditForm class="thread-panel form-grid" Model="followUpEmailRequest" OnValidSubmit="SendFollowUpNotificationAsync">
+            <DataAnnotationsValidator />
+
+            @if (SelectedFollowUpLead is null)
+            {
+              <p class="empty-note">Select a user from the left to prepare a notification email.</p>
+            }
+            else
+            {
+              <div class="notification-recipient">
+                <strong>@SelectedFollowUpLead.FullName</strong>
+                <span>@SelectedFollowUpLead.Email</span>
+                <span>@GetLeadPlanLabel(SelectedFollowUpLead.RequestedPlan) | @GetLeadOrderSummary(SelectedFollowUpLead)</span>
+              </div>
+
+              <div class="lead-detail-grid">
+                <div class="lead-detail-card">
+                  <strong>Phone</strong>
+                  <span>@(string.IsNullOrWhiteSpace(SelectedFollowUpLead.Phone) ? "Not provided" : SelectedFollowUpLead.Phone)</span>
+                </div>
+                <div class="lead-detail-card">
+                  <strong>Broker</strong>
+                  <span>@(string.IsNullOrWhiteSpace(SelectedFollowUpLead.Mt4Broker) ? "Not provided" : SelectedFollowUpLead.Mt4Broker)</span>
+                </div>
+                <div class="lead-detail-card">
+                  <strong>Last Login</strong>
+                  <span>@(SelectedFollowUpLead.LastLoginAtUtc.HasValue ? SelectedFollowUpLead.LastLoginAtUtc.Value.ToLocalTime().ToString("dd MMM yyyy hh:mm tt") : "Never")</span>
+                </div>
+                <div class="lead-detail-card">
+                  <strong>Last Order</strong>
+                  <span>@GetLeadLastOrderText(SelectedFollowUpLead)</span>
+                </div>
+              </div>
+
+              <div>
+                <label>Email Subject</label>
+                <InputText @bind-Value="followUpEmailRequest.Subject" placeholder="Kohinoor EA follow-up" />
+                <ValidationMessage For="@(() => followUpEmailRequest.Subject)" />
+              </div>
+
+              <div>
+                <label>Email Message</label>
+                <InputTextArea @bind-Value="followUpEmailRequest.Message" placeholder="Write your follow-up message here..." />
+                <ValidationMessage For="@(() => followUpEmailRequest.Message)" />
+              </div>
+
+              <p class="helper-text">This email is sent to the selected user's registered account email using the SMTP settings configured on the server.</p>
+
+              <div class="button-row">
+                <button class="submit-btn" type="submit" disabled="@(!CanSendFollowUpEmail)">@(isSendingFollowUpEmail ? "Sending..." : "Send Notification Email")</button>
+                <button class="ghost-btn" type="button" disabled="@(SelectedFollowUpLead is null)" @onclick="ResetFollowUpDraft">Reset Draft</button>
+              </div>
+            }
+          </EditForm>
+        </div>
+      }
       else if (activeSection == AdminSection.Support)
       {
         <div class="panel-header">
@@ -1676,6 +1886,7 @@ else
         Products,
         Orders,
         Customers,
+        Notifications,
         Support
     }
 
@@ -1696,6 +1907,7 @@ else
     private readonly List<SupportQueryDto> supportTrace = new();
     private readonly List<SupportQueryMessageDto> expandedSupportMessages = new();
     private readonly List<AdminUserDto> customers = new();
+    private readonly List<AdminLeadNotificationDto> followUpLeads = new();
     private readonly List<ToastMessage> toasts = new();
     private readonly Dictionary<long, string> pendingOrderStatuses = new();
     private readonly HashSet<long> savingOrderIds = new();
@@ -1703,6 +1915,7 @@ else
     private readonly List<string> descriptionFeatureInputs = new();
     private CreateProductRequest createProduct = new() { IsActive = true };
     private CreateSupportQueryMessageRequest adminReplyRequest = new();
+    private SendLeadFollowUpEmailRequest followUpEmailRequest = new();
     private AdminSection activeSection = AdminSection.Products;
     private string? statusMessage;
     private string profileEmail = string.Empty;
@@ -1710,6 +1923,7 @@ else
     private string productFilter = string.Empty;
     private string orderFilter = string.Empty;
     private string customerFilter = string.Empty;
+    private string followUpLeadFilter = string.Empty;
     private int toastCounter;
     private int productCount;
     private int orderCount;
@@ -1719,8 +1933,10 @@ else
     private bool isSupportMaximized;
     private bool isProductsMaximized;
     private bool isUploadingImage;
+    private bool isSendingFollowUpEmail;
     private long? expandedSupportQueryId;
     private long? editingProductId;
+    private long? selectedFollowUpLeadUserId;
     private string? selectedImageName;
 
     [Inject]
@@ -1745,6 +1961,7 @@ else
         AdminSection.Products => "Product Management",
         AdminSection.Orders => "Order Control Center",
         AdminSection.Customers => "Customer Accounts",
+        AdminSection.Notifications => "Notification Center",
         _ => "Support Operations"
     };
 
@@ -1753,6 +1970,7 @@ else
         AdminSection.Products => editingProductId.HasValue ? "Editing Product" : "Publishing Tools",
         AdminSection.Orders => "Order Workflow",
         AdminSection.Customers => "Customer Directory",
+        AdminSection.Notifications => "Lead Follow-up",
         _ => "Support Queue"
     };
 
@@ -1761,6 +1979,7 @@ else
         AdminSection.Products => editingProductId.HasValue ? "You are editing a product. Update it from the left form and the catalog stays scrollable on the right." : "Create product cards that flow into pricing, dashboard, and cart surfaces with the same content model.",
         AdminSection.Orders => "Filter orders and keep saving statuses without losing scroll position.",
         AdminSection.Customers => "Review the admin users table with creation dates, roles, and last login activity.",
+        AdminSection.Notifications => "Select users with no completed purchase yet, personalize the draft, and send a follow-up email without leaving the dashboard.",
         _ => "Open any conversation, inspect the thread, and reply inline from a focused admin view."
     };
 
@@ -1778,6 +1997,17 @@ else
         .Where(customer => MatchesCustomerFilter(customer))
         .OrderByDescending(item => item.CreatedAtUtc)
         .ToList();
+
+    private List<AdminLeadNotificationDto> FilteredFollowUpLeads => followUpLeads
+        .Where(lead => MatchesFollowUpLeadFilter(lead))
+        .OrderByDescending(item => item.CreatedAtUtc)
+        .ToList();
+
+    private AdminLeadNotificationDto? SelectedFollowUpLead => selectedFollowUpLeadUserId.HasValue
+        ? followUpLeads.FirstOrDefault(lead => lead.UserId == selectedFollowUpLeadUserId.Value)
+        : null;
+
+    private bool CanSendFollowUpEmail => !isSendingFollowUpEmail && SelectedFollowUpLead is not null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1840,6 +2070,7 @@ else
         {
             "orders" => AdminSection.Orders,
             "customers" => AdminSection.Customers,
+            "notifications" => AdminSection.Notifications,
             "support" => AdminSection.Support,
             _ => AdminSection.Products
         };
@@ -1857,6 +2088,7 @@ else
         {
             AdminSection.Orders => "orders",
             AdminSection.Customers => "customers",
+            AdminSection.Notifications => "notifications",
             AdminSection.Support => "support",
             _ => "products"
         };
@@ -1870,13 +2102,15 @@ else
         var productsTask = Http.GetAsync("api/commerce/products?all=true");
         var supportTask = Http.GetAsync("api/commerce/support/trace");
         var customersTask = Http.GetAsync("api/auth/users");
+        var followUpLeadsTask = Http.GetAsync("api/auth/follow-up-leads");
 
-        await Task.WhenAll(ordersTask, productsTask, supportTask, customersTask);
+        await Task.WhenAll(ordersTask, productsTask, supportTask, customersTask, followUpLeadsTask);
 
         var ordersResponse = await ordersTask;
         var productsResponse = await productsTask;
         var supportResponse = await supportTask;
         var customersResponse = await customersTask;
+        var followUpLeadsResponse = await followUpLeadsTask;
 
         orderTrace.Clear();
         if (ordersResponse.IsSuccessStatusCode)
@@ -1906,10 +2140,28 @@ else
             customers.AddRange(payload ?? Enumerable.Empty<AdminUserDto>());
         }
 
+        followUpLeads.Clear();
+        if (followUpLeadsResponse.IsSuccessStatusCode)
+        {
+            var payload = await followUpLeadsResponse.Content.ReadFromJsonAsync<List<AdminLeadNotificationDto>>();
+            followUpLeads.AddRange(payload ?? Enumerable.Empty<AdminLeadNotificationDto>());
+        }
+
         pendingOrderStatuses.Clear();
         foreach (var order in orderTrace)
         {
             pendingOrderStatuses[order.OrderId] = NormalizeOrderStatus(order.Status);
+        }
+
+        if (selectedFollowUpLeadUserId.HasValue && followUpLeads.All(lead => lead.UserId != selectedFollowUpLeadUserId.Value))
+        {
+            selectedFollowUpLeadUserId = null;
+            followUpEmailRequest = new SendLeadFollowUpEmailRequest();
+        }
+
+        if (!selectedFollowUpLeadUserId.HasValue && followUpLeads.Count > 0)
+        {
+            SelectFollowUpLead(followUpLeads[0]);
         }
 
         productCount = products.Count;
@@ -2307,6 +2559,57 @@ else
         adminReplyRequest = new CreateSupportQueryMessageRequest();
     }
 
+    private void SelectFollowUpLead(AdminLeadNotificationDto lead)
+    {
+        selectedFollowUpLeadUserId = lead.UserId;
+        followUpEmailRequest = BuildFollowUpDraft(lead);
+    }
+
+    private void ResetFollowUpDraft()
+    {
+        if (SelectedFollowUpLead is null)
+        {
+            return;
+        }
+
+        followUpEmailRequest = BuildFollowUpDraft(SelectedFollowUpLead);
+    }
+
+    private async Task SendFollowUpNotificationAsync()
+    {
+        statusMessage = null;
+
+        var lead = SelectedFollowUpLead;
+        if (lead is null)
+        {
+            statusMessage = "Select a user before sending a notification.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            return;
+        }
+
+        isSendingFollowUpEmail = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/auth/follow-up-leads/{lead.UserId}/email", followUpEmailRequest);
+            var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+
+            if (!response.IsSuccessStatusCode || payload?.Success != true)
+            {
+                statusMessage = payload?.Message ?? "Unable to send the notification email.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            statusMessage = payload.Message;
+            _ = ShowToastAsync(payload.Message);
+        }
+        finally
+        {
+            isSendingFollowUpEmail = false;
+        }
+    }
+
     private bool MatchesProductFilter(ProductDto product)
     {
         if (string.IsNullOrWhiteSpace(productFilter))
@@ -2370,6 +2673,28 @@ else
         return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
     }
 
+    private bool MatchesFollowUpLeadFilter(AdminLeadNotificationDto lead)
+    {
+        if (string.IsNullOrWhiteSpace(followUpLeadFilter))
+        {
+            return true;
+        }
+
+        var needle = followUpLeadFilter.Trim();
+        var haystack = string.Join(" ", new[]
+        {
+            lead.FullName,
+            lead.Email,
+            lead.Phone,
+            lead.Mt4Broker,
+            GetLeadPlanLabel(lead.RequestedPlan),
+            GetLeadOrderSummary(lead),
+            lead.LastOrderStatus
+        });
+
+        return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task ShowToastAsync(string text, bool isError = false)
     {
         var id = ++toastCounter;
@@ -2400,6 +2725,57 @@ else
             "open" => "open",
             "active" => "open",
             _ => "pending"
+        };
+    }
+
+    private static string GetLeadPlanLabel(string? requestedPlan)
+    {
+        return requestedPlan?.Trim().ToLowerInvariant() switch
+        {
+            "annual" => "Annual Plan",
+            "lifetime" => "Lifetime 4 Years",
+            "demo" => "Demo / Trial",
+            _ => "Plan not selected"
+        };
+    }
+
+    private static string GetLeadOrderSummary(AdminLeadNotificationDto lead)
+    {
+        if (lead.TotalOrders <= 0)
+        {
+            return "No order started yet";
+        }
+
+        var orderLabel = lead.TotalOrders == 1 ? "1 order started" : $"{lead.TotalOrders} orders started";
+        return $"{orderLabel} | Last: {NormalizeOrderStatus(lead.LastOrderStatus)}";
+    }
+
+    private static string GetLeadLastOrderText(AdminLeadNotificationDto lead)
+    {
+        if (!lead.LastOrderAtUtc.HasValue)
+        {
+            return "No order created yet.";
+        }
+
+        return $"{NormalizeOrderStatus(lead.LastOrderStatus)} on {lead.LastOrderAtUtc.Value.ToLocalTime():dd MMM yyyy hh:mm tt}";
+    }
+
+    private static SendLeadFollowUpEmailRequest BuildFollowUpDraft(AdminLeadNotificationDto lead)
+    {
+        var planLabel = GetLeadPlanLabel(lead.RequestedPlan);
+
+        return new SendLeadFollowUpEmailRequest
+        {
+            Subject = $"Kohinoor EA follow-up for your {planLabel}",
+            Message =
+$@"Hello {lead.FullName},
+
+We noticed that you created your Kohinoor EA account for the {planLabel} but have not completed a purchase yet.
+
+If you need help choosing the right plan, completing your payment, or getting started with setup, reply to this email and our team will help you.
+
+Regards,
+Kohinoor EA Support"
         };
     }
 

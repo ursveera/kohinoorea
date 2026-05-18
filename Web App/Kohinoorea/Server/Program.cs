@@ -1,5 +1,5 @@
-using System.Text;
 using Dapper;
+using Kohinoorea.Client.Services;
 using Kohinoorea.Server.Middleware;
 using Kohinoorea.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using SqlKata.Compilers;
 using SqlKata.Execution;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,9 +61,16 @@ builder.Services.AddScoped<QueryFactory>(sp =>
     new QueryFactory(sp.GetRequiredService<SqlConnection>(), new SqlServerCompiler()));
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ICommerceRepository, CommerceRepository>();
+builder.Services.AddScoped<IEmailDeliveryService, SmtpEmailDeliveryService>();
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddSingleton<IPasswordHasher<string>, PasswordHasher<string>>();
 
+builder.Services.Configure<CurrencyPricingOptions>(
+    builder.Configuration.GetSection("CurrencyPricing"));
+
+builder.Services.AddMemoryCache();
+
+builder.Services.AddHttpClient<CurrencyRateService>();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -91,5 +99,13 @@ app.UseAuthorization();
 app.MapRazorPages();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
+app.MapGet("/api/currency/rate/{currencyCode}",
+    async (
+        string currencyCode,
+        CurrencyRateService currencyRateService) =>
+    {
+        var result = await currencyRateService.GetUsdRateAsync(currencyCode);
+        return Results.Ok(result);
+    });
 
 app.Run();
