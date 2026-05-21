@@ -227,6 +227,69 @@ public sealed class CommerceController : ControllerBase
         return Ok(orders);
     }
 
+    [AllowAnonymous]
+    [HttpGet("faqs")]
+    public async Task<ActionResult<IReadOnlyList<FaqDto>>> GetFaqs(CancellationToken cancellationToken)
+    {
+        var faqs = await _commerceRepository.GetFaqsAsync(onlyActive: true, cancellationToken);
+        return Ok(faqs);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpGet("faqs/admin")]
+    public async Task<ActionResult<IReadOnlyList<FaqDto>>> GetAdminFaqs(CancellationToken cancellationToken)
+    {
+        var faqs = await _commerceRepository.GetFaqsAsync(onlyActive: false, cancellationToken);
+        return Ok(faqs);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPost("faqs")]
+    public async Task<ActionResult<FaqDto>> CreateFaq([FromBody] CreateFaqRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var faqId = await _commerceRepository.CreateFaqAsync(request, cancellationToken);
+        var created = await _commerceRepository.GetFaqByIdAsync(faqId, cancellationToken);
+        return created is null ? NotFound() : Ok(created);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPut("faqs/{faqId:long}")]
+    public async Task<ActionResult<FaqDto>> UpdateFaq([FromRoute] long faqId, [FromBody] CreateFaqRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var updated = await _commerceRepository.UpdateFaqAsync(faqId, request, cancellationToken);
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        var faq = await _commerceRepository.GetFaqByIdAsync(faqId, cancellationToken);
+        return faq is null ? NotFound() : Ok(faq);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPut("faqs/{faqId:long}/active/{isActive:bool}")]
+    public async Task<ActionResult<FaqDto>> SetFaqActive([FromRoute] long faqId, [FromRoute] bool isActive, CancellationToken cancellationToken)
+    {
+        var updated = await _commerceRepository.SetFaqActiveAsync(faqId, isActive, cancellationToken);
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        var faq = await _commerceRepository.GetFaqByIdAsync(faqId, cancellationToken);
+        return faq is null ? NotFound() : Ok(faq);
+    }
+
     [HttpGet("support/my")]
     public async Task<ActionResult<IReadOnlyList<SupportQueryDto>>> GetMySupportQueries(CancellationToken cancellationToken)
     {
@@ -309,6 +372,11 @@ public sealed class CommerceController : ControllerBase
             return Forbid();
         }
 
+        if (string.Equals(query.Status, "Closed", StringComparison.OrdinalIgnoreCase))
+        {
+            await _commerceRepository.UpdateSupportQueryStatusAsync(queryId, "Open", cancellationToken);
+        }
+
         var messageId = await _commerceRepository.CreateSupportQueryMessageAsync(queryId, AuthRoles.User, userId, request.Message, cancellationToken);
         var messages = await _commerceRepository.GetSupportQueryMessagesAsync(queryId, cancellationToken);
         var created = messages.FirstOrDefault(m => m.Id == messageId);
@@ -357,6 +425,19 @@ public sealed class CommerceController : ControllerBase
         var messages = await _commerceRepository.GetSupportQueryMessagesAsync(queryId, cancellationToken);
         var created = messages.FirstOrDefault(m => m.Id == messageId);
         return created is null ? NotFound() : Ok(created);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPatch("support/{queryId:long}/status")]
+    public async Task<ActionResult> UpdateSupportQueryStatus([FromRoute] long queryId, [FromBody] UpdateSupportQueryStatusRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var updated = await _commerceRepository.UpdateSupportQueryStatusAsync(queryId, request.Status.Trim(), cancellationToken);
+        return updated ? NoContent() : NotFound();
     }
 
     [Authorize(Roles = AuthRoles.Admin)]

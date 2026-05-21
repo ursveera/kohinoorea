@@ -12,6 +12,8 @@ public interface IAuthRepository
 
     Task<AdminLeadNotificationDto?> GetFollowUpCandidateAsync(long userId, CancellationToken cancellationToken = default);
 
+    Task<bool> SetUserActiveAsync(long userId, bool isActive, CancellationToken cancellationToken = default);
+
     Task<long> CreateUserAsync(SignupRequest request, string passwordHash, CancellationToken cancellationToken = default);
 
     Task<long> CreateSignupSubmissionAsync(SignupRequest request, CancellationToken cancellationToken = default);

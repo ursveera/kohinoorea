@@ -8,6 +8,10 @@ public sealed class UserOrderDto
 
     public string ProductName { get; set; } = string.Empty;
 
+    public decimal UnitPrice { get; set; }
+
+    public int Quantity { get; set; }
+
     public DateTime OrderedAtUtc { get; set; }
 
     public decimal TotalAmount { get; set; }

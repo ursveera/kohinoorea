@@ -32,6 +32,20 @@ window.kohinoorAuthGetLastActivityUtc = function () {
   return localStorage.getItem("authLastActivityUtc");
 };
 
+window.kohinoorDownloadFile = function (fileName, content, mimeType) {
+  var blob = new Blob([content], { type: mimeType || "application/octet-stream" });
+  var objectUrl = URL.createObjectURL(blob);
+  var anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName || "download";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(function () {
+    URL.revokeObjectURL(objectUrl);
+  }, 0);
+};
+
 window.kohinoorAuthActivityInit = function () {
   if (window.__kohinoorAuthActivityBound) {
     return;
@@ -81,4 +95,3 @@ window.kohinoorHighlightTabsInit = function () {
     });
   });
 };
-

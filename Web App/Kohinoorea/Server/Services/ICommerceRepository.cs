@@ -24,6 +24,16 @@ public interface ICommerceRepository
 
     Task<IReadOnlyList<UserOrderDto>> GetUserOrdersAsync(long userId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FaqDto>> GetFaqsAsync(bool onlyActive, CancellationToken cancellationToken = default);
+
+    Task<FaqDto?> GetFaqByIdAsync(long faqId, CancellationToken cancellationToken = default);
+
+    Task<long> CreateFaqAsync(CreateFaqRequest request, CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateFaqAsync(long faqId, CreateFaqRequest request, CancellationToken cancellationToken = default);
+
+    Task<bool> SetFaqActiveAsync(long faqId, bool isActive, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SupportQueryDto>> GetSupportQueriesAsync(long userId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SupportQueryDto>> GetAllSupportQueriesAsync(CancellationToken cancellationToken = default);
@@ -35,6 +45,8 @@ public interface ICommerceRepository
     Task<long> CreateSupportQueryAsync(long userId, CreateSupportQueryRequest request, CancellationToken cancellationToken = default);
 
     Task<long> CreateSupportQueryMessageAsync(long queryId, string senderRole, long? senderUserId, string message, CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateSupportQueryStatusAsync(long queryId, string status, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<OrderTraceDto>> GetOrderTraceAsync(CancellationToken cancellationToken = default);
 

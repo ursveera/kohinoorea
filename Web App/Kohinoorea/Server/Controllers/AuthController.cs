@@ -178,6 +178,38 @@ public sealed class AuthController : ControllerBase
     }
 
     [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPut("users/{userId:long}/active/{isActive:bool}")]
+    public async Task<ActionResult> SetUserActive([FromRoute] long userId, [FromRoute] bool isActive, CancellationToken cancellationToken)
+    {
+        var currentUserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!isActive && long.TryParse(currentUserIdClaim, out var currentUserId) && currentUserId == userId)
+        {
+            return BadRequest(new AuthResponse
+            {
+                Success = false,
+                Message = "You cannot deactivate your own admin account."
+            });
+        }
+
+        var updated = await _authRepository.SetUserActiveAsync(userId, isActive, cancellationToken);
+        if (!updated)
+        {
+            return NotFound(new AuthResponse
+            {
+                Success = false,
+                Message = "User not found."
+            });
+        }
+
+        return Ok(new AuthResponse
+        {
+            Success = true,
+            Message = isActive ? "User activated successfully." : "User deactivated successfully.",
+            UserId = userId
+        });
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
     [HttpGet("follow-up-leads")]
     public async Task<ActionResult<IReadOnlyList<AdminLeadNotificationDto>>> GetFollowUpLeads(CancellationToken cancellationToken)
     {

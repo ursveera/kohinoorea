@@ -58,6 +58,19 @@ public sealed class AuthRepository : IAuthRepository
             .FirstOrDefaultAsync<AdminLeadNotificationDto>(cancellationToken: cancellationToken);
     }
 
+    public async Task<bool> SetUserActiveAsync(long userId, bool isActive, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Where(AuthSqlKataSchema.UserColumns.Id, userId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.UserColumns.IsActive] = isActive
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
     public async Task<long> CreateUserAsync(SignupRequest request, string passwordHash, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

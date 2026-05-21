@@ -478,6 +478,7 @@
   body[data-theme="dark"] .closed { color: #cbd5e1; }
 
   .product-management-layout,
+  .faq-layout,
   .support-layout,
   .notification-layout {
     display: grid;
@@ -1194,6 +1195,82 @@
     margin-bottom: 4px;
   }
 
+  .faq-list {
+    display: grid;
+    gap: 14px;
+    max-height: 74vh;
+    overflow-y: auto;
+    padding-right: 6px;
+    align-content: start;
+  }
+
+  .faq-card {
+    border: 1px solid var(--d-query-border);
+    background: var(--d-query-bg);
+    color: inherit;
+    padding: 18px;
+    border-radius: 20px;
+    display: grid;
+    gap: 12px;
+    transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+  }
+
+  .faq-card.active,
+  .faq-card:hover {
+    border-color: rgba(251,191,36,0.35);
+    transform: translateY(-2px);
+  }
+
+  .faq-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .faq-card h4 {
+    margin: 0;
+    color: var(--d-text);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  .faq-card-answer {
+    margin: 0;
+    color: var(--d-muted);
+    font-size: 13px;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .faq-card-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .faq-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--d-form-border);
+    background: color-mix(in srgb, var(--d-form-bg) 84%, transparent);
+    color: var(--d-label-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .faq-empty-panel {
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px dashed var(--d-form-border);
+    background: color-mix(in srgb, var(--d-form-bg) 82%, transparent);
+  }
+
   .notification-recipient {
     display: grid;
     gap: 6px;
@@ -1266,6 +1343,7 @@
     .cards,
     .product-grid,
     .product-management-layout,
+    .faq-layout,
     .support-layout,
     .notification-layout,
     .lead-detail-grid {
@@ -1316,6 +1394,7 @@
     <button class="nav-button @(activeSection == AdminSection.Products ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Products)">Products</button>
     <button class="nav-button @(activeSection == AdminSection.Orders ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Orders)">Orders</button>
     <button class="nav-button @(activeSection == AdminSection.Customers ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Customers)">Customers</button>
+    <button class="nav-button @(activeSection == AdminSection.Faq ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Faq)">FAQ</button>
     <button class="nav-button @(activeSection == AdminSection.Notifications ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Notifications)">Notifications</button>
     <button class="nav-button @(activeSection == AdminSection.Support ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Support)">Support</button>
 
@@ -1329,7 +1408,7 @@
     <header class="topbar" id="overview">
       <div>
         <h2>@PageTitle</h2>
-        <p>Jump directly to Products, Orders, Customers, or Support and work each section inside its own scrollable control panel.</p>
+        <p>Jump directly to Products, Orders, Customers, FAQ, Notifications, or Support and work each section inside its own scrollable control panel.</p>
       </div>
       <div class="profile">
         <div class="avatar">@AvatarInitial</div>
@@ -1360,6 +1439,13 @@
         <h3>Customers</h3>
         <p>Load the users table and inspect account activity in one place.</p>
         <div class="stat-number">@customerCount</div>
+      </div>
+
+      <div class="stat-card @(activeSection == AdminSection.Faq ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Faq)">
+        <div class="stat-icon">F</div>
+        <h3>FAQ</h3>
+        <p>Publish premium question-and-answer content for the public FAQ page.</p>
+        <div class="stat-number">@faqCount</div>
       </div>
 
       <div class="stat-card @(activeSection == AdminSection.Notifications ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Notifications)">
@@ -1632,7 +1718,7 @@
           <span class="badge">User Accounts</span>
         </div>
 
-        <input class="filter-box" @bind="customerFilter" @bind:event="oninput" placeholder="Filter customers by name, email, phone, broker, or role..." />
+        <input class="filter-box" @bind="customerFilter" @bind:event="oninput" placeholder="Filter customers by name, email, phone, role, or status..." />
 
         <div class="table-wrap">
           <table>
@@ -1640,7 +1726,6 @@
               <tr>
                 <th>User</th>
                 <th>Contact</th>
-                <th>Broker</th>
                 <th>Role</th>
                 <th>Status</th>
                 <th>Created</th>
@@ -1651,7 +1736,7 @@
               @if (FilteredCustomers.Count == 0)
               {
                 <tr>
-                  <td colspan="7">No customers match this filter.</td>
+                  <td colspan="6">No customers match this filter.</td>
                 </tr>
               }
               else
@@ -1671,9 +1756,15 @@
                         <small>@(string.IsNullOrWhiteSpace(customer.Phone) ? "No phone" : customer.Phone)</small>
                       </div>
                     </td>
-                    <td>@(string.IsNullOrWhiteSpace(customer.Mt4Broker) ? "-" : customer.Mt4Broker)</td>
                     <td>@customer.Role</td>
-                    <td><span class="status @(customer.IsActive ? "open" : "closed")">@(customer.IsActive ? "Active" : "Inactive")</span></td>
+                    <td>
+                      <div class="order-actions">
+                        <span class="status @(customer.IsActive ? "open" : "closed")">@(customer.IsActive ? "Active" : "Inactive")</span>
+                        <button class="ghost-btn" type="button" disabled="@savingCustomerIds.Contains(customer.Id)" @onclick="() => ToggleCustomerActiveAsync(customer)">
+                          @(savingCustomerIds.Contains(customer.Id) ? "Saving..." : customer.IsActive ? "Deactivate" : "Activate")
+                        </button>
+                      </div>
+                    </td>
                     <td>@customer.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
                     <td>@(customer.LastLoginAtUtc.HasValue ? customer.LastLoginAtUtc.Value.ToLocalTime().ToString("dd MMM yyyy hh:mm tt") : "Never")</td>
                   </tr>
@@ -1681,6 +1772,92 @@
               }
             </tbody>
           </table>
+        </div>
+      }
+      else if (activeSection == AdminSection.Faq)
+      {
+        <div class="panel-header">
+          <div>
+            <h3>FAQ Management</h3>
+            <p class="section-intro">Create premium FAQ entries, control their order, and decide which ones appear on the public FAQ page.</p>
+          </div>
+          <span class="badge">Public Content</span>
+        </div>
+
+        <div class="faq-layout">
+          <div class="thread-panel">
+            <input class="filter-box" @bind="faqFilter" @bind:event="oninput" placeholder="Filter FAQs by question, answer, order, or status..." />
+
+            <div class="faq-list">
+              @if (FilteredFaqs.Count == 0)
+              {
+                <div class="faq-empty-panel">
+                  <p class="empty-note">No FAQs match this filter yet.</p>
+                </div>
+              }
+              else
+              {
+                @foreach (var faq in FilteredFaqs)
+                {
+                  <div class="faq-card @(editingFaqId == faq.Id ? "active" : null)">
+                    <div class="faq-card-header">
+                      <h4>@faq.Question</h4>
+                      <span class="status @(faq.IsActive ? "open" : "closed")">@(faq.IsActive ? "Visible" : "Hidden")</span>
+                    </div>
+
+                    <p class="faq-card-answer">@faq.Answer</p>
+
+                    <div class="faq-card-meta">
+                      <span class="faq-chip">Order @faq.DisplayOrder</span>
+                      <span class="faq-chip">Created @faq.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    </div>
+
+                    <div class="button-row">
+                      <button class="ghost-btn" type="button" @onclick="() => StartEditingFaq(faq)">Edit</button>
+                      <button class="ghost-btn" type="button" @onclick="() => ToggleFaqActiveAsync(faq)">
+                        @(faq.IsActive ? "Hide" : "Show")
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+
+          <EditForm class="management-form form-grid" Model="faqRequest" OnValidSubmit="SaveFaqAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div>
+              <label>Question</label>
+              <InputText @bind-Value="faqRequest.Question" placeholder="What is Kohinoor EA?" />
+            </div>
+
+            <div>
+              <label>Answer</label>
+              <InputTextArea @bind-Value="faqRequest.Answer" placeholder="Write the full FAQ answer here..." />
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label>Display Order</label>
+                <InputNumber @bind-Value="faqRequest.DisplayOrder" />
+              </div>
+              <label class="toggle-row">
+                <InputCheckbox @bind-Value="faqRequest.IsActive" /> Show on public FAQ page
+              </label>
+            </div>
+
+            <p class="helper-text">Lower display order appears first on the public FAQ page. Hidden FAQs stay in admin only.</p>
+
+            <div class="button-row">
+              <button class="submit-btn" type="submit" disabled="@isSavingFaq">@(isSavingFaq ? "Saving..." : editingFaqId.HasValue ? "Update FAQ" : "Add FAQ")</button>
+              @if (editingFaqId.HasValue)
+              {
+                <button class="ghost-btn" type="button" @onclick="ResetFaqForm">Cancel Edit</button>
+              }
+            </div>
+          </EditForm>
         </div>
       }
       else if (activeSection == AdminSection.Notifications)
@@ -1784,6 +1961,7 @@
       }
       else if (activeSection == AdminSection.Support)
       {
+        var selectedSupportQuery = SelectedSupportThreadQuery;
         <div class="panel-header">
           <div>
             <h3>Support Query Trace</h3>
@@ -1821,7 +1999,7 @@
           </div>
 
           <div class="thread-panel">
-            @if (!expandedSupportQueryId.HasValue)
+            @if (!expandedSupportQueryId.HasValue || selectedSupportQuery is null)
             {
               <p class="empty-note">Open any support query to inspect the full conversation and send an admin reply.</p>
             }
@@ -1829,10 +2007,15 @@
             {
               <div class="thread-meta" style="margin-bottom:14px;">
                 <div>
-                  <h4 style="margin-bottom:4px;">Thread #@expandedSupportQueryId</h4>
-                  <p class="summary-caption" style="margin-bottom:0;">Customer conversation and admin response composer.</p>
+                  <h4 style="margin-bottom:4px;">@selectedSupportQuery.Subject</h4>
+                  <p class="summary-caption" style="margin-bottom:0;">Ticket #@selectedSupportQuery.Id • @selectedSupportQuery.Category • @selectedSupportQuery.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</p>
                 </div>
-                <button class="ghost-btn" type="button" @onclick="CloseSupportThread">Close Thread</button>
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" disabled="@isUpdatingSupportTicketStatus" @onclick="ToggleSelectedSupportTicketStatusAsync">
+                    @(IsSupportTicketClosed(selectedSupportQuery.Status) ? "Reopen Ticket" : "Close Ticket")
+                  </button>
+                  <button class="ghost-btn" type="button" @onclick="CloseSupportThread">Close Thread</button>
+                </div>
               </div>
 
               <div class="thread-stack">
@@ -1886,6 +2069,7 @@ else
         Products,
         Orders,
         Customers,
+        Faq,
         Notifications,
         Support
     }
@@ -1904,6 +2088,7 @@ else
 
     private readonly List<ProductDto> products = new();
     private readonly List<OrderTraceDto> orderTrace = new();
+    private readonly List<FaqDto> faqs = new();
     private readonly List<SupportQueryDto> supportTrace = new();
     private readonly List<SupportQueryMessageDto> expandedSupportMessages = new();
     private readonly List<AdminUserDto> customers = new();
@@ -1911,9 +2096,11 @@ else
     private readonly List<ToastMessage> toasts = new();
     private readonly Dictionary<long, string> pendingOrderStatuses = new();
     private readonly HashSet<long> savingOrderIds = new();
+    private readonly HashSet<long> savingCustomerIds = new();
     private readonly List<string> descriptionSummaryInputs = new();
     private readonly List<string> descriptionFeatureInputs = new();
     private CreateProductRequest createProduct = new() { IsActive = true };
+    private CreateFaqRequest faqRequest = new() { IsActive = true };
     private CreateSupportQueryMessageRequest adminReplyRequest = new();
     private SendLeadFollowUpEmailRequest followUpEmailRequest = new();
     private AdminSection activeSection = AdminSection.Products;
@@ -1923,19 +2110,24 @@ else
     private string productFilter = string.Empty;
     private string orderFilter = string.Empty;
     private string customerFilter = string.Empty;
+    private string faqFilter = string.Empty;
     private string followUpLeadFilter = string.Empty;
     private int toastCounter;
     private int productCount;
     private int orderCount;
     private int customerCount;
+    private int faqCount;
     private decimal totalRevenue;
     private bool canRenderDashboard;
     private bool isSupportMaximized;
     private bool isProductsMaximized;
     private bool isUploadingImage;
+    private bool isSavingFaq;
     private bool isSendingFollowUpEmail;
+    private bool isUpdatingSupportTicketStatus;
     private long? expandedSupportQueryId;
     private long? editingProductId;
+    private long? editingFaqId;
     private long? selectedFollowUpLeadUserId;
     private string? selectedImageName;
 
@@ -1961,6 +2153,7 @@ else
         AdminSection.Products => "Product Management",
         AdminSection.Orders => "Order Control Center",
         AdminSection.Customers => "Customer Accounts",
+        AdminSection.Faq => "FAQ Publishing",
         AdminSection.Notifications => "Notification Center",
         _ => "Support Operations"
     };
@@ -1970,6 +2163,7 @@ else
         AdminSection.Products => editingProductId.HasValue ? "Editing Product" : "Publishing Tools",
         AdminSection.Orders => "Order Workflow",
         AdminSection.Customers => "Customer Directory",
+        AdminSection.Faq => editingFaqId.HasValue ? "Editing FAQ" : "FAQ Publisher",
         AdminSection.Notifications => "Lead Follow-up",
         _ => "Support Queue"
     };
@@ -1979,6 +2173,7 @@ else
         AdminSection.Products => editingProductId.HasValue ? "You are editing a product. Update it from the left form and the catalog stays scrollable on the right." : "Create product cards that flow into pricing, dashboard, and cart surfaces with the same content model.",
         AdminSection.Orders => "Filter orders and keep saving statuses without losing scroll position.",
         AdminSection.Customers => "Review the admin users table with creation dates, roles, and last login activity.",
+        AdminSection.Faq => editingFaqId.HasValue ? "Update the selected FAQ answer or visibility and publish changes back to the public page." : "Create premium FAQ content with clean ordering and visibility control for the public site.",
         AdminSection.Notifications => "Select users with no completed purchase yet, personalize the draft, and send a follow-up email without leaving the dashboard.",
         _ => "Open any conversation, inspect the thread, and reply inline from a focused admin view."
     };
@@ -1998,6 +2193,12 @@ else
         .OrderByDescending(item => item.CreatedAtUtc)
         .ToList();
 
+    private List<FaqDto> FilteredFaqs => faqs
+        .Where(faq => MatchesFaqFilter(faq))
+        .OrderBy(item => item.DisplayOrder)
+        .ThenByDescending(item => item.CreatedAtUtc)
+        .ToList();
+
     private List<AdminLeadNotificationDto> FilteredFollowUpLeads => followUpLeads
         .Where(lead => MatchesFollowUpLeadFilter(lead))
         .OrderByDescending(item => item.CreatedAtUtc)
@@ -2005,6 +2206,10 @@ else
 
     private AdminLeadNotificationDto? SelectedFollowUpLead => selectedFollowUpLeadUserId.HasValue
         ? followUpLeads.FirstOrDefault(lead => lead.UserId == selectedFollowUpLeadUserId.Value)
+        : null;
+
+    private SupportQueryDto? SelectedSupportThreadQuery => expandedSupportQueryId.HasValue
+        ? supportTrace.FirstOrDefault(query => query.Id == expandedSupportQueryId.Value)
         : null;
 
     private bool CanSendFollowUpEmail => !isSendingFollowUpEmail && SelectedFollowUpLead is not null;
@@ -2070,6 +2275,7 @@ else
         {
             "orders" => AdminSection.Orders,
             "customers" => AdminSection.Customers,
+            "faq" => AdminSection.Faq,
             "notifications" => AdminSection.Notifications,
             "support" => AdminSection.Support,
             _ => AdminSection.Products
@@ -2088,6 +2294,7 @@ else
         {
             AdminSection.Orders => "orders",
             AdminSection.Customers => "customers",
+            AdminSection.Faq => "faq",
             AdminSection.Notifications => "notifications",
             AdminSection.Support => "support",
             _ => "products"
@@ -2100,14 +2307,16 @@ else
 
         var ordersTask = Http.GetAsync("api/commerce/orders/trace");
         var productsTask = Http.GetAsync("api/commerce/products?all=true");
+        var faqsTask = Http.GetAsync("api/commerce/faqs/admin");
         var supportTask = Http.GetAsync("api/commerce/support/trace");
         var customersTask = Http.GetAsync("api/auth/users");
         var followUpLeadsTask = Http.GetAsync("api/auth/follow-up-leads");
 
-        await Task.WhenAll(ordersTask, productsTask, supportTask, customersTask, followUpLeadsTask);
+        await Task.WhenAll(ordersTask, productsTask, faqsTask, supportTask, customersTask, followUpLeadsTask);
 
         var ordersResponse = await ordersTask;
         var productsResponse = await productsTask;
+        var faqsResponse = await faqsTask;
         var supportResponse = await supportTask;
         var customersResponse = await customersTask;
         var followUpLeadsResponse = await followUpLeadsTask;
@@ -2124,6 +2333,13 @@ else
         {
             var payload = await productsResponse.Content.ReadFromJsonAsync<List<ProductDto>>();
             products.AddRange(payload ?? Enumerable.Empty<ProductDto>());
+        }
+
+        faqs.Clear();
+        if (faqsResponse.IsSuccessStatusCode)
+        {
+            var payload = await faqsResponse.Content.ReadFromJsonAsync<List<FaqDto>>();
+            faqs.AddRange(payload ?? Enumerable.Empty<FaqDto>());
         }
 
         supportTrace.Clear();
@@ -2167,6 +2383,7 @@ else
         productCount = products.Count;
         orderCount = orderTrace.Count;
         customerCount = customers.Count;
+        faqCount = faqs.Count;
         totalRevenue = orderTrace.Sum(x => x.TotalAmount);
     }
 
@@ -2296,6 +2513,79 @@ else
         selectedImageName = null;
       descriptionSummaryInputs.Clear();
       descriptionFeatureInputs.Clear();
+    }
+
+    private async Task SaveFaqAsync()
+    {
+        statusMessage = null;
+        isSavingFaq = true;
+
+        try
+        {
+            HttpResponseMessage response;
+            if (editingFaqId.HasValue)
+            {
+                response = await Http.PutAsJsonAsync($"api/commerce/faqs/{editingFaqId.Value}", faqRequest);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/commerce/faqs", faqRequest);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                statusMessage = editingFaqId.HasValue ? "Failed to update FAQ." : "Failed to add FAQ.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            statusMessage = editingFaqId.HasValue ? "FAQ updated." : "FAQ added.";
+            _ = ShowToastAsync(statusMessage);
+            await LoadDashboardDataAsync();
+            ResetFaqForm();
+            NavigateToSection(AdminSection.Faq);
+        }
+        finally
+        {
+            isSavingFaq = false;
+        }
+    }
+
+    private void StartEditingFaq(FaqDto faq)
+    {
+        editingFaqId = faq.Id;
+        faqRequest = new CreateFaqRequest
+        {
+            Question = faq.Question,
+            Answer = faq.Answer,
+            DisplayOrder = faq.DisplayOrder,
+            IsActive = faq.IsActive
+        };
+
+        activeSection = AdminSection.Faq;
+        statusMessage = $"Editing FAQ #{faq.Id}.";
+    }
+
+    private void ResetFaqForm()
+    {
+        editingFaqId = null;
+        faqRequest = new CreateFaqRequest { IsActive = true };
+    }
+
+    private async Task ToggleFaqActiveAsync(FaqDto faq)
+    {
+        var nextActive = !faq.IsActive;
+        var response = await Http.PutAsync($"api/commerce/faqs/{faq.Id}/active/{nextActive.ToString().ToLowerInvariant()}", content: null);
+        if (!response.IsSuccessStatusCode)
+        {
+            statusMessage = "Failed to update FAQ visibility.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            return;
+        }
+
+        statusMessage = nextActive ? "FAQ is now visible on the public page." : "FAQ hidden from the public page.";
+        _ = ShowToastAsync(statusMessage);
+        await LoadDashboardDataAsync();
     }
 
     private void AddDescriptionSummaryField()
@@ -2489,6 +2779,46 @@ else
         _ = ShowToastAsync($"Order #{row.OrderId} marked as {nextStatus}.");
     }
 
+    private async Task ToggleCustomerActiveAsync(AdminUserDto customer)
+    {
+        var nextActive = !customer.IsActive;
+        savingCustomerIds.Add(customer.Id);
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PutAsync($"api/auth/users/{customer.Id}/active/{nextActive.ToString().ToLowerInvariant()}", content: null);
+            AuthResponse? payload = null;
+
+            if (response.Content.Headers.ContentLength is > 0 || response.Content.Headers.ContentType is not null)
+            {
+                try
+                {
+                    payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                }
+                catch
+                {
+                }
+            }
+
+            if (!response.IsSuccessStatusCode || payload?.Success == false)
+            {
+                statusMessage = payload?.Message ?? "Unable to update customer status.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            statusMessage = payload?.Message ?? (nextActive ? "User activated successfully." : "User deactivated successfully.");
+            _ = ShowToastAsync(statusMessage);
+            await LoadDashboardDataAsync();
+        }
+        finally
+        {
+            savingCustomerIds.Remove(customer.Id);
+            StateHasChanged();
+        }
+    }
+
     private void ToggleSupportMaximize()
     {
         isSupportMaximized = !isSupportMaximized;
@@ -2550,6 +2880,54 @@ else
         statusMessage = "Admin reply sent.";
         _ = ShowToastAsync("Reply sent.");
         await LoadSupportThreadAsync(queryId);
+    }
+
+    private Task ToggleSelectedSupportTicketStatusAsync()
+    {
+        var selectedQuery = SelectedSupportThreadQuery;
+        if (selectedQuery is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var nextStatus = IsSupportTicketClosed(selectedQuery.Status) ? "Open" : "Closed";
+        return UpdateSupportTicketStatusAsync(nextStatus);
+    }
+
+    private async Task UpdateSupportTicketStatusAsync(string nextStatus)
+    {
+        var selectedQuery = SelectedSupportThreadQuery;
+        if (selectedQuery is null)
+        {
+            return;
+        }
+
+        isUpdatingSupportTicketStatus = true;
+
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"api/commerce/support/{selectedQuery.Id}/status", new UpdateSupportQueryStatusRequest
+            {
+                Status = nextStatus
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                statusMessage = "Unable to update support ticket status.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            selectedQuery.Status = nextStatus;
+            statusMessage = string.Equals(nextStatus, "Closed", StringComparison.OrdinalIgnoreCase)
+                ? "Support ticket closed."
+                : "Support ticket reopened.";
+            _ = ShowToastAsync(statusMessage);
+        }
+        finally
+        {
+            isUpdatingSupportTicketStatus = false;
+        }
     }
 
     private void CloseSupportThread()
@@ -2665,9 +3043,27 @@ else
             customer.FullName,
             customer.Email,
             customer.Phone,
-            customer.Mt4Broker,
             customer.Role,
             customer.IsActive ? "active" : "inactive"
+        });
+
+        return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesFaqFilter(FaqDto faq)
+    {
+        if (string.IsNullOrWhiteSpace(faqFilter))
+        {
+            return true;
+        }
+
+        var needle = faqFilter.Trim();
+        var haystack = string.Join(" ", new[]
+        {
+            faq.Question,
+            faq.Answer,
+            faq.DisplayOrder.ToString(),
+            faq.IsActive ? "visible active shown" : "hidden inactive"
         });
 
         return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
@@ -2726,6 +3122,11 @@ else
             "active" => "open",
             _ => "pending"
         };
+    }
+
+    private static bool IsSupportTicketClosed(string? status)
+    {
+        return string.Equals(status?.Trim(), "Closed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetLeadPlanLabel(string? requestedPlan)
