@@ -8,6 +8,7 @@ public static class AuthSqlKataSchema
     public const string OrdersTable = "orders";
     public const string CartItemsTable = "cart_items";
     public const string FaqsTable = "faqs";
+    public const string ContactMessagesTable = "contact_messages";
     public const string SupportQueriesTable = "support_queries";
     public const string SupportQueryMessagesTable = "support_query_messages";
 
@@ -82,6 +83,18 @@ public static class AuthSqlKataSchema
         public const string DisplayOrder = "display_order";
         public const string IsActive = "is_active";
         public const string CreatedAtUtc = "created_at_utc";
+    }
+
+    public static class ContactMessageColumns
+    {
+        public const string Id = "id";
+        public const string Name = "name";
+        public const string Email = "email";
+        public const string Subject = "subject";
+        public const string Message = "message";
+        public const string IsReplied = "is_replied";
+        public const string CreatedAtUtc = "created_at_utc";
+        public const string LastRepliedAtUtc = "last_replied_at_utc";
     }
 
     public static class SupportQueryColumns

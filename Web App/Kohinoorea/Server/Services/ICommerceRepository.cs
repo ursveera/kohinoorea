@@ -34,6 +34,14 @@ public interface ICommerceRepository
 
     Task<bool> SetFaqActiveAsync(long faqId, bool isActive, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ContactMessageDto>> GetContactMessagesAsync(CancellationToken cancellationToken = default);
+
+    Task<ContactMessageDto?> GetContactMessageByIdAsync(long contactMessageId, CancellationToken cancellationToken = default);
+
+    Task<long> CreateContactMessageAsync(CreateContactMessageRequest request, CancellationToken cancellationToken = default);
+
+    Task<bool> MarkContactMessageRepliedAsync(long contactMessageId, DateTime repliedAtUtc, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SupportQueryDto>> GetSupportQueriesAsync(long userId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SupportQueryDto>> GetAllSupportQueriesAsync(CancellationToken cancellationToken = default);

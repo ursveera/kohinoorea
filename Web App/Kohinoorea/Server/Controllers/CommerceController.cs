@@ -13,11 +13,13 @@ namespace Kohinoorea.Server.Controllers;
 public sealed class CommerceController : ControllerBase
 {
     private readonly ICommerceRepository _commerceRepository;
+    private readonly IEmailDeliveryService _emailDeliveryService;
     private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public CommerceController(ICommerceRepository commerceRepository, IWebHostEnvironment webHostEnvironment)
+    public CommerceController(ICommerceRepository commerceRepository, IEmailDeliveryService emailDeliveryService, IWebHostEnvironment webHostEnvironment)
     {
         _commerceRepository = commerceRepository;
+        _emailDeliveryService = emailDeliveryService;
         _webHostEnvironment = webHostEnvironment;
     }
 
@@ -288,6 +290,70 @@ public sealed class CommerceController : ControllerBase
 
         var faq = await _commerceRepository.GetFaqByIdAsync(faqId, cancellationToken);
         return faq is null ? NotFound() : Ok(faq);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("contact-messages")]
+    public async Task<ActionResult<AuthResponse>> CreateContactMessage([FromBody] CreateContactMessageRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        await _commerceRepository.CreateContactMessageAsync(request, cancellationToken);
+
+        return Ok(new AuthResponse
+        {
+            Success = true,
+            Message = "Thanks for reaching out. Your message is now in our support inbox."
+        });
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpGet("contact-messages")]
+    public async Task<ActionResult<IReadOnlyList<ContactMessageDto>>> GetContactMessages(CancellationToken cancellationToken)
+    {
+        var messages = await _commerceRepository.GetContactMessagesAsync(cancellationToken);
+        return Ok(messages);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPost("contact-messages/{contactMessageId:long}/reply")]
+    public async Task<ActionResult<AuthResponse>> ReplyToContactMessage([FromRoute] long contactMessageId, [FromBody] SendContactReplyRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var contactMessage = await _commerceRepository.GetContactMessageByIdAsync(contactMessageId, cancellationToken);
+        if (contactMessage is null)
+        {
+            return NotFound(new AuthResponse
+            {
+                Success = false,
+                Message = "That contact message could not be found."
+            });
+        }
+
+        var result = await _emailDeliveryService.SendPlainTextEmailAsync(contactMessage.Email, request.Subject, request.Message, cancellationToken);
+        if (!result.Success)
+        {
+            return BadRequest(new AuthResponse
+            {
+                Success = false,
+                Message = result.Message
+            });
+        }
+
+        await _commerceRepository.MarkContactMessageRepliedAsync(contactMessageId, DateTime.UtcNow, cancellationToken);
+
+        return Ok(new AuthResponse
+        {
+            Success = true,
+            Message = "Reply email sent successfully."
+        });
     }
 
     [HttpGet("support/my")]

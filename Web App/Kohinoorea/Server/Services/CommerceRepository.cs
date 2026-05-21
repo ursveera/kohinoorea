@@ -266,6 +266,72 @@ public sealed class CommerceRepository : ICommerceRepository
         return affected > 0;
     }
 
+    public async Task<IReadOnlyList<ContactMessageDto>> GetContactMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _queryFactory
+            .Query(AuthSqlKataSchema.ContactMessagesTable)
+            .SelectRaw("id as Id")
+            .SelectRaw("name as Name")
+            .SelectRaw("email as Email")
+            .SelectRaw("subject as Subject")
+            .SelectRaw("message as Message")
+            .SelectRaw("is_replied as IsReplied")
+            .SelectRaw("created_at_utc as CreatedAtUtc")
+            .SelectRaw("last_replied_at_utc as LastRepliedAtUtc")
+            .OrderByDesc(AuthSqlKataSchema.ContactMessageColumns.CreatedAtUtc)
+            .GetAsync<ContactMessageDto>(cancellationToken: cancellationToken);
+
+        return rows.ToList();
+    }
+
+    public async Task<ContactMessageDto?> GetContactMessageByIdAsync(long contactMessageId, CancellationToken cancellationToken = default)
+    {
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.ContactMessagesTable)
+            .SelectRaw("id as Id")
+            .SelectRaw("name as Name")
+            .SelectRaw("email as Email")
+            .SelectRaw("subject as Subject")
+            .SelectRaw("message as Message")
+            .SelectRaw("is_replied as IsReplied")
+            .SelectRaw("created_at_utc as CreatedAtUtc")
+            .SelectRaw("last_replied_at_utc as LastRepliedAtUtc")
+            .Where(AuthSqlKataSchema.ContactMessageColumns.Id, contactMessageId)
+            .FirstOrDefaultAsync<ContactMessageDto>(cancellationToken: cancellationToken);
+    }
+
+    public async Task<long> CreateContactMessageAsync(CreateContactMessageRequest request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.ContactMessagesTable)
+            .InsertGetIdAsync<long>(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.ContactMessageColumns.Name] = request.Name.Trim(),
+                [AuthSqlKataSchema.ContactMessageColumns.Email] = request.Email.Trim().ToLowerInvariant(),
+                [AuthSqlKataSchema.ContactMessageColumns.Subject] = request.Subject.Trim(),
+                [AuthSqlKataSchema.ContactMessageColumns.Message] = request.Message.Trim(),
+                [AuthSqlKataSchema.ContactMessageColumns.IsReplied] = false,
+                [AuthSqlKataSchema.ContactMessageColumns.CreatedAtUtc] = now,
+                [AuthSqlKataSchema.ContactMessageColumns.LastRepliedAtUtc] = null
+            }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> MarkContactMessageRepliedAsync(long contactMessageId, DateTime repliedAtUtc, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.ContactMessagesTable)
+            .Where(AuthSqlKataSchema.ContactMessageColumns.Id, contactMessageId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.ContactMessageColumns.IsReplied] = true,
+                [AuthSqlKataSchema.ContactMessageColumns.LastRepliedAtUtc] = repliedAtUtc
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
     public async Task<IReadOnlyList<SupportQueryDto>> GetSupportQueriesAsync(long userId, CancellationToken cancellationToken = default)
     {
         var rows = await _queryFactory
