@@ -347,3 +347,97 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.contact_messages', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.contact_messages
+    (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        name NVARCHAR(120) NOT NULL,
+        email NVARCHAR(255) NOT NULL,
+        subject NVARCHAR(200) NOT NULL,
+        message NVARCHAR(4000) NOT NULL,
+        is_replied BIT NOT NULL CONSTRAINT DF_contact_messages_is_replied DEFAULT (0),
+        created_at_utc DATETIME2(7) NOT NULL CONSTRAINT DF_contact_messages_created_at_utc DEFAULT (SYSUTCDATETIME()),
+        last_replied_at_utc DATETIME2(7) NULL
+    );
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'name') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD name NVARCHAR(120) NULL;
+    UPDATE dbo.contact_messages SET name = N'Unknown Contact' WHERE name IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN name NVARCHAR(120) NOT NULL;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'email') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD email NVARCHAR(255) NULL;
+    UPDATE dbo.contact_messages SET email = N'' WHERE email IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN email NVARCHAR(255) NOT NULL;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'subject') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD subject NVARCHAR(200) NULL;
+    UPDATE dbo.contact_messages SET subject = N'Contact Request' WHERE subject IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN subject NVARCHAR(200) NOT NULL;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'message') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD message NVARCHAR(4000) NULL;
+    UPDATE dbo.contact_messages SET message = N'' WHERE message IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN message NVARCHAR(4000) NOT NULL;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'is_replied') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD is_replied BIT NULL;
+    UPDATE dbo.contact_messages SET is_replied = 0 WHERE is_replied IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN is_replied BIT NOT NULL;
+END;
+GO
+
+IF OBJECT_ID(N'DF_contact_messages_is_replied', N'D') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD CONSTRAINT DF_contact_messages_is_replied DEFAULT (0) FOR is_replied;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'created_at_utc') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD created_at_utc DATETIME2(7) NULL;
+    UPDATE dbo.contact_messages SET created_at_utc = SYSUTCDATETIME() WHERE created_at_utc IS NULL;
+    ALTER TABLE dbo.contact_messages ALTER COLUMN created_at_utc DATETIME2(7) NOT NULL;
+END;
+GO
+
+IF OBJECT_ID(N'DF_contact_messages_created_at_utc', N'D') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD CONSTRAINT DF_contact_messages_created_at_utc DEFAULT (SYSUTCDATETIME()) FOR created_at_utc;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.contact_messages', N'last_replied_at_utc') IS NULL
+BEGIN
+    ALTER TABLE dbo.contact_messages ADD last_replied_at_utc DATETIME2(7) NULL;
+END;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'dbo.contact_messages')
+      AND name = N'IX_contact_messages_reply_created'
+)
+BEGIN
+    CREATE INDEX IX_contact_messages_reply_created
+        ON dbo.contact_messages (is_replied, created_at_utc DESC);
+END;
+GO
