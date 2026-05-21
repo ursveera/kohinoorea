@@ -1,5 +1,6 @@
 @page "/dashboard"
 @implements IDisposable
+@using System.Net
 @using System.Text.RegularExpressions
 @using Kohinoorea.Client.Services
 
@@ -380,6 +381,13 @@
     color: var(--d-text);
   }
 
+  .section-intro {
+    color: var(--d-muted);
+    margin-top: 6px;
+    line-height: 1.6;
+    max-width: 760px;
+  }
+
   .badge {
     padding: 8px 12px;
     border-radius: 999px;
@@ -391,12 +399,16 @@
   }
 
   /* ── Table ────────────────────────────────────────── */
-  .table-wrap { overflow-x: auto; }
+  .table-wrap {
+    overflow: auto;
+    max-height: 60vh;
+    padding-right: 4px;
+  }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 760px;
+    min-width: 920px;
   }
 
   th, td {
@@ -404,6 +416,7 @@
     text-align: left;
     border-bottom: 1px solid var(--d-row-border);
     font-size: 14px;
+    vertical-align: middle;
   }
 
   th {
@@ -412,6 +425,11 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 700;
+    position: sticky;
+    top: 0;
+    background: color-mix(in srgb, var(--d-panel-bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    z-index: 1;
   }
 
   td { color: var(--d-td-color); }
@@ -539,114 +557,370 @@
     color: #f59e0b;
   }
 
+  .order-table-actions {
+    display: flex;
+    justify-content: flex-start;
+  }
+
   /* ── Support ──────────────────────────────────────── */
   .support-layout {
     display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
     gap: 22px;
-    height: 68vh;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 72vh;
+    align-items: start;
   }
 
   .support-layout.maximized {
-    grid-template-columns: 1fr;
-    max-height: none;
-    height: 100%;
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   }
 
   .support-layout > * { min-height: 0; }
 
-  .support-layout.maximized .support-form { display: none; }
+  .support-layout.maximized .support-create-card { display: none; }
+
+  .support-sidebar-panel,
+  .support-thread-panel {
+    padding: 20px;
+    border-radius: 24px;
+    background: var(--d-form-bg);
+    border: 1px solid var(--d-form-border);
+    display: grid;
+    gap: 16px;
+    min-height: 0;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .support-sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+  }
+
+  .support-thread-panel {
+    min-height: 72vh;
+  }
+
+  .support-premium-card {
+    padding: 18px;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at top right, rgba(251,191,36,0.18), transparent 42%),
+      linear-gradient(135deg, rgba(251,191,36,0.12), rgba(168,85,247,0.12));
+    border: 1px solid rgba(251,191,36,0.22);
+    display: grid;
+    gap: 12px;
+  }
+
+  .support-premium-card h4 {
+    color: var(--d-text);
+    font-size: 18px;
+  }
+
+  .support-premium-card p {
+    color: var(--d-label-text);
+    line-height: 1.6;
+    font-size: 13px;
+  }
+
+  .support-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .support-stat {
+    min-width: 110px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: grid;
+    gap: 4px;
+  }
+
+  body[data-theme="light"] .support-stat {
+    background: rgba(255,255,255,0.55);
+    border-color: rgba(0,0,0,0.06);
+  }
+
+  .support-stat strong {
+    color: var(--d-text);
+    font-size: 19px;
+  }
+
+  .support-stat span {
+    color: var(--d-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .support-tabs {
+    display: flex;
+    gap: 10px;
+  }
+
+  .support-tab {
+    flex: 1;
+    border: 1px solid var(--d-ghost-border);
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: var(--d-ghost-bg);
+    color: var(--d-ghost-text);
+    cursor: pointer;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    transition: 0.2s ease;
+  }
+
+  .support-tab strong {
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+
+  .support-tab span {
+    min-width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,0.08);
+    font-size: 12px;
+  }
+
+  body[data-theme="light"] .support-tab span {
+    background: rgba(0,0,0,0.05);
+  }
+
+  .support-tab.active,
+  .support-tab:hover {
+    color: var(--d-text);
+    border-color: rgba(251,191,36,0.35);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+  }
+
+  .support-tab.active {
+    background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(249,115,22,0.12));
+  }
 
   .query-list {
     display: grid;
     gap: 14px;
     overflow-y: auto;
     padding-right: 6px;
-    min-height: 0;
-    max-height: 100%;
-    height: 100%;
+    min-height: 220px;
+    max-height: 360px;
     align-content: start;
   }
 
-  .query-card {
-    padding: 18px;
-    border-radius: 20px;
-    background: var(--d-query-bg);
-    border: 1px solid var(--d-query-border);
-    transition: background 0.3s, border-color 0.3s;
+  .support-layout.maximized .query-list {
+    max-height: 460px;
   }
 
-  .query-card h4 { margin-bottom: 8px; color: var(--d-text); }
+  .ticket-card {
+    border: 1px solid var(--d-query-border);
+    border-radius: 20px;
+    background: var(--d-query-bg);
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    color: inherit;
+  }
 
-  .query-card p {
+  .ticket-card:hover,
+  .ticket-card.active {
+    transform: translateY(-2px);
+    border-color: rgba(251,191,36,0.32);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.12);
+  }
+
+  .ticket-card.active {
+    background: color-mix(in srgb, var(--d-query-bg) 82%, rgba(251,191,36,0.16));
+  }
+
+  .ticket-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .ticket-card-heading {
+    display: grid;
+    gap: 6px;
+  }
+
+  .ticket-title {
+    color: var(--d-text);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .ticket-ticket-id {
+    color: var(--d-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .ticket-preview {
     color: var(--d-muted);
     font-size: 14px;
-    line-height: 1.55;
+    line-height: 1.6;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ticket-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--d-nav-border);
+    background: color-mix(in srgb, var(--d-nav-hover) 82%, transparent);
+    color: var(--d-label-text);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .ticket-card-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .thread-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--d-divider);
+  }
+
+  .thread-meta h4 {
+    color: var(--d-text);
+    margin-bottom: 6px;
+    font-size: 20px;
+  }
+
+  .thread-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
     margin-bottom: 12px;
   }
 
-  .query-thread {
-    margin-top: 14px;
-    border-top: 1px solid var(--d-divider);
-    padding-top: 14px;
+  .thread-stack {
+    flex: 1 1 auto;
+    min-height: 320px;
+    overflow-y: auto;
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid var(--d-query-border);
+    background:
+      radial-gradient(circle at top right, rgba(37,99,235,0.08), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
     display: grid;
-    gap: 10px;
+    gap: 12px;
+    align-content: start;
+  }
+
+  .thread-placeholder {
+    min-height: 100%;
+    border-radius: 22px;
+    border: 1px dashed var(--d-form-border);
+    background: color-mix(in srgb, var(--d-form-bg) 85%, transparent);
+    display: grid;
+    place-items: center;
+    padding: 28px;
+    text-align: center;
+  }
+
+  .thread-placeholder h4 {
+    color: var(--d-text);
+    margin-bottom: 10px;
+    font-size: 20px;
+  }
+
+  .thread-placeholder p {
+    color: var(--d-muted);
+    line-height: 1.7;
+    max-width: 420px;
   }
 
   .chat-bubble {
-    max-width: 82%;
-    padding: 10px 12px;
-    border-radius: 14px;
+    max-width: min(82%, 520px);
+    padding: 12px 14px;
+    border-radius: 18px;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.08);
   }
 
   .chat-bubble.user {
     justify-self: end;
-    background: rgba(251,191,36,0.18);
-    border: 1px solid rgba(251,191,36,0.3);
+    background: linear-gradient(135deg, rgba(251,191,36,0.22), rgba(249,115,22,0.2));
+    border: 1px solid rgba(251,191,36,0.28);
     color: #d97706;
+    border-bottom-right-radius: 6px;
   }
 
   body[data-theme="dark"] .chat-bubble.user {
     color: #fde68a;
-    background: rgba(251,191,36,0.18);
   }
 
   .chat-bubble.admin {
     justify-self: start;
     background: rgba(96,165,250,0.12);
-    border: 1px solid rgba(96,165,250,0.22);
+    border: 1px solid rgba(96,165,250,0.2);
     color: #2563eb;
+    border-bottom-left-radius: 6px;
   }
 
   body[data-theme="dark"] .chat-bubble.admin {
     color: #bfdbfe;
-    background: rgba(96,165,250,0.15);
+    background: rgba(96,165,250,0.16);
   }
 
   .chat-meta {
     display: block;
-    margin-top: 6px;
+    margin-top: 8px;
     font-size: 11px;
     opacity: 0.75;
   }
 
-  .inline-reply {
-    margin-top: 10px;
+  .support-chat-composer {
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
 
-  .query-meta {
+  .support-chat-composer textarea {
+    margin-bottom: 0;
+    min-height: 110px;
+  }
+
+  .composer-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--d-muted);
+    gap: 12px;
+  }
+
+  .composer-actions .empty-note,
+  .composer-actions .summary-caption {
+    margin: 0;
+  }
+
+  .support-create-card {
+    margin-top: 0;
   }
 
   .support-form {
@@ -655,6 +929,16 @@
     background: var(--d-form-bg);
     border: 1px solid var(--d-form-border);
     transition: background 0.3s, border-color 0.3s;
+  }
+
+  .support-form h4 {
+    color: var(--d-text);
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+
+  .support-form .summary-caption {
+    margin-bottom: 14px;
   }
 
   .support-form label {
@@ -691,10 +975,51 @@
     resize: vertical;
   }
 
+  .query-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--d-muted);
+  }
+
+  .support-closed-note {
+    margin-bottom: 0;
+  }
+
+  .ticket-empty-state {
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px dashed var(--d-query-border);
+    color: var(--d-empty-text);
+    line-height: 1.7;
+  }
+
+  .thread-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .query-card {
+    padding: 18px;
+    border-radius: 20px;
+    background: var(--d-query-bg);
+    border: 1px solid var(--d-query-border);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
   /* ── Misc ─────────────────────────────────────────── */
   .empty-note {
     color: var(--d-empty-text);
     line-height: 1.7;
+  }
+
+  .summary-caption {
+    color: var(--d-empty-text);
+    line-height: 1.7;
+    margin-bottom: 16px;
   }
 
   @@media (max-width: 1100px) {
@@ -702,6 +1027,22 @@
     .product-grid,
     .support-layout {
       grid-template-columns: 1fr;
+    }
+
+    .support-layout,
+    .support-layout.maximized {
+      min-height: auto;
+    }
+
+    .support-sidebar-panel,
+    .support-thread-panel {
+      min-height: 420px;
+    }
+
+    .composer-actions,
+    .thread-meta {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 
@@ -790,6 +1131,10 @@
           <h3>Orders & Transaction History</h3>
           <span class="badge">Secure Records</span>
         </div>
+        @if (!string.IsNullOrWhiteSpace(orderStatusMessage))
+        {
+          <p class="summary-caption">@orderStatusMessage</p>
+        }
         <div class="table-wrap">
           <table>
             <thead>
@@ -800,12 +1145,13 @@
                 <th>Amount</th>
                 <th>Payment</th>
                 <th>Status</th>
+                <th>Invoice</th>
               </tr>
             </thead>
             <tbody>
               @if (orders.Count == 0)
               {
-                <tr><td colspan="6">No orders found.</td></tr>
+                <tr><td colspan="7">No orders found.</td></tr>
               }
               else
               {
@@ -817,7 +1163,19 @@
                     <td>@order.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
                     <td>@currency.FormatFromUsd(order.TotalAmount)</td>
                     <td>@(string.IsNullOrWhiteSpace(order.PaymentMethod) ? "Card" : order.PaymentMethod)</td>
-                    <td><span class="status @GetStatusCss(order.Status)">@((string.IsNullOrWhiteSpace(order.Status) ? "Pending" : order.Status))</span></td>
+                    <td><span class="status @GetStatusCss(order.Status)">@GetOrderStatusLabel(order.Status)</span></td>
+                    <td>
+                      <div class="order-table-actions">
+                        @if (CanDownloadInvoice(order))
+                        {
+                          <button class="ghost-btn" type="button" @onclick="() => DownloadInvoiceAsync(order)">Download Invoice</button>
+                        }
+                        else
+                        {
+                          <button class="ghost-btn" type="button" disabled title="Invoice becomes available after the order is completed.">Available After Completion</button>
+                        }
+                      </div>
+                    </td>
                   </tr>
                 }
               }
@@ -871,11 +1229,16 @@
       }
       else if (activeSection == DashboardSection.Support)
       {
+        var selectedQuery = SelectedSupportQuery;
+        var visibleQueries = FilteredSupportQueries.ToList();
         <div class="panel-header">
-          <h3>Queries & Custom Support</h3>
+          <div>
+            <h3>Premium Support Desk</h3>
+            <p class="section-intro">Switch between open and closed tickets, then continue each conversation in a chat-style workspace.</p>
+          </div>
           <div style="display:flex; gap:10px; align-items:center;">
-            <span class="badge">Admin Support</span>
-            <button class="ghost-btn" type="button" @onclick="ToggleSupportMaximize">@(isSupportMaximized ? "Minimize" : "Maximize")</button>
+            <span class="badge">Priority Support</span>
+            <button class="ghost-btn" type="button" @onclick="ToggleSupportMaximize">@(isSupportMaximized ? "Minimize" : "Focus Chat")</button>
           </div>
         </div>
         @if (!string.IsNullOrWhiteSpace(supportStatusMessage))
@@ -883,78 +1246,145 @@
           <p class="summary-caption">@supportStatusMessage</p>
         }
         <div class="support-layout @(isSupportMaximized ? "maximized" : null)">
-          <div class="query-list">
-            @if (queries.Count == 0)
+          <div class="support-sidebar-panel">
+            <div class="support-premium-card">
+              <h4>Premium help, tracked by ticket</h4>
+              <p>Select any ticket to continue the conversation like chat, or create a fresh ticket for a new issue.</p>
+              <div class="support-stats">
+                <div class="support-stat">
+                  <strong>@OpenSupportQueryCount</strong>
+                  <span>Open Tickets</span>
+                </div>
+                <div class="support-stat">
+                  <strong>@ClosedSupportQueryCount</strong>
+                  <span>Closed Tickets</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="support-tabs" role="tablist" aria-label="Support ticket filters">
+              <button class="support-tab @(activeSupportTicketFilter == SupportTicketFilter.Open ? "active" : null)" type="button" @onclick="() => SelectSupportTicketFilter(SupportTicketFilter.Open)">
+                <strong>Open</strong>
+                <span>@OpenSupportQueryCount</span>
+              </button>
+              <button class="support-tab @(activeSupportTicketFilter == SupportTicketFilter.Closed ? "active" : null)" type="button" @onclick="() => SelectSupportTicketFilter(SupportTicketFilter.Closed)">
+                <strong>Closed</strong>
+                <span>@ClosedSupportQueryCount</span>
+              </button>
+            </div>
+
+            <div class="query-list">
+              @if (visibleQueries.Count == 0)
+              {
+                <div class="ticket-empty-state">No @GetSupportFilterLabel(activeSupportTicketFilter).ToLowerInvariant() tickets yet.</div>
+              }
+              else
+              {
+                @foreach (var query in visibleQueries)
+                {
+                  <div class="ticket-card @(selectedQuery?.Id == query.Id ? "active" : null)">
+                    <div class="ticket-card-top">
+                      <div class="ticket-card-heading">
+                        <div class="ticket-title">@query.Subject</div>
+                        <span class="ticket-ticket-id">Ticket #@query.Id</span>
+                      </div>
+                      <span class="status @GetStatusCss(query.Status)">@GetSupportStatusLabel(query.Status)</span>
+                    </div>
+                    <p class="ticket-preview">@query.Message</p>
+                    <div class="query-meta">
+                      <span class="ticket-chip">@query.Category</span>
+                      <span>@query.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</span>
+                    </div>
+                    <div class="ticket-card-actions">
+                      <button class="ghost-btn" type="button" @onclick="() => OpenQueryThreadAsync(query.Id)">
+                        @(selectedQuery?.Id == query.Id ? "Chat Open" : "Open Chat")
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+
+            <EditForm class="support-form support-create-card" Model="supportRequest" OnValidSubmit="SubmitSupportAsync">
+              <DataAnnotationsValidator />
+              <h4>Create New Ticket</h4>
+              <p class="summary-caption">Start a fresh conversation with the support team for orders, payments, products, or setup help.</p>
+              <label>Subject</label>
+              <InputText @bind-Value="supportRequest.Subject" placeholder="Enter ticket subject" />
+
+              <label>Category</label>
+              <InputSelect @bind-Value="supportRequest.Category">
+                <option value="Order">Order</option>
+                <option value="Payment">Payment</option>
+                <option value="Product">Product</option>
+                <option value="General">General</option>
+              </InputSelect>
+
+              <label>Your Question</label>
+              <InputTextArea @bind-Value="supportRequest.Message" placeholder="Write your question for admin..." />
+
+              <button class="submit-btn" type="submit">Create Ticket</button>
+            </EditForm>
+          </div>
+
+          <div class="support-thread-panel">
+            @if (selectedQuery is null)
             {
-              <p class="empty-note">No support queries yet.</p>
+              <div class="thread-placeholder">
+                <div>
+                  <h4>Select a ticket</h4>
+                  <p>Pick any open or closed ticket from the left to view the full conversation in a WhatsApp-style chat layout.</p>
+                </div>
+              </div>
             }
             else
             {
-              @foreach (var query in queries)
-              {
-                <div class="query-card">
-                  <h4>@query.Subject</h4>
-                  <p><strong>@query.Category:</strong> @query.Message</p>
-                  <div class="query-meta">
-                    <span>@query.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</span>
-                    <span style="display:flex; align-items:center; gap:10px;">
-                      <span class="status @GetStatusCss(query.Status)">@query.Status</span>
-                      <button class="ghost-btn" type="button" @onclick="() => ToggleQueryThreadAsync(query.Id)">@(expandedQueryId == query.Id ? "Close" : "Open")</button>
-                    </span>
+              <div class="thread-meta">
+                <div>
+                  <div class="thread-badges">
+                    <span class="status @GetStatusCss(selectedQuery.Status)">@GetSupportStatusLabel(selectedQuery.Status)</span>
+                    <span class="ticket-chip">@selectedQuery.Category</span>
                   </div>
+                  <h4>@selectedQuery.Subject</h4>
+                  <p class="summary-caption">Ticket #@selectedQuery.Id • Opened @selectedQuery.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</p>
+                </div>
+                <div class="thread-actions">
+                  <button class="ghost-btn" type="button" @onclick="CloseQueryThread">Close Chat</button>
+                </div>
+              </div>
 
-                  @if (expandedQueryId == query.Id)
+              <div class="thread-stack">
+                @if (activeQueryMessages.Count == 0)
+                {
+                  <p class="empty-note">No replies yet.</p>
+                }
+                else
+                {
+                  @foreach (var message in activeQueryMessages)
                   {
-                    <div class="query-thread">
-                      @if (activeQueryMessages.Count == 0)
-                      {
-                        <p class="empty-note">No replies yet.</p>
-                      }
-                      else
-                      {
-                        @foreach (var message in activeQueryMessages)
-                        {
-                          var bubbleCss = string.Equals(message.SenderRole, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase) ? "admin" : "user";
-                          <div class="chat-bubble @bubbleCss">
-                            @message.Message
-                            <span class="chat-meta">@message.SenderRole • @message.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</span>
-                          </div>
-                        }
-                      }
+                    var bubbleCss = string.Equals(message.SenderRole, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase) ? "admin" : "user";
+                    <div class="chat-bubble @bubbleCss">
+                      @message.Message
+                      <span class="chat-meta">@message.SenderRole • @message.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</span>
                     </div>
                   }
-                </div>
-              }
-            }
+                }
+              </div>
 
-            @if (expandedQueryId.HasValue)
-            {
-              <EditForm class="inline-reply" Model="replyRequest" OnValidSubmit="SubmitReplyAsync">
+              <EditForm class="support-chat-composer" Model="replyRequest" OnValidSubmit="SubmitReplyAsync">
                 <DataAnnotationsValidator />
-                <InputTextArea @bind-Value="replyRequest.Message" placeholder="Reply to this query..." />
-                <button class="submit-btn" type="submit">Send Reply</button>
+                @if (IsClosedSupportTicket(selectedQuery.Status))
+                {
+                  <p class="summary-caption support-closed-note">This ticket is currently closed. Sending a message will reopen it and move it back to Open Tickets.</p>
+                }
+                <InputTextArea @bind-Value="replyRequest.Message" placeholder="Type your message..." />
+                <div class="composer-actions">
+                  <p class="empty-note">Admin replies stay inside this thread so your full support history is always visible.</p>
+                  <button class="submit-btn" type="submit">@(IsClosedSupportTicket(selectedQuery.Status) ? "Send & Reopen" : "Send Message")</button>
+                </div>
               </EditForm>
             }
           </div>
-
-          <EditForm class="support-form" Model="supportRequest" OnValidSubmit="SubmitSupportAsync">
-            <DataAnnotationsValidator />
-            <label>Subject</label>
-            <InputText @bind-Value="supportRequest.Subject" placeholder="Enter query subject" />
-
-            <label>Category</label>
-            <InputSelect @bind-Value="supportRequest.Category">
-              <option value="Order">Order</option>
-              <option value="Payment">Payment</option>
-              <option value="Product">Product</option>
-              <option value="General">General</option>
-            </InputSelect>
-
-            <label>Your Question</label>
-            <InputTextArea @bind-Value="supportRequest.Message" placeholder="Write your question for admin..." />
-
-            <button class="submit-btn" type="submit">Send to Admin</button>
-          </EditForm>
         </div>
       }
     </section>
@@ -977,6 +1407,12 @@
         Support
     }
 
+    private enum SupportTicketFilter
+    {
+        Open,
+        Closed
+    }
+
     private readonly List<UserOrderDto> orders = new();
     private readonly List<ProductDto> products = new();
     private readonly List<SupportQueryDto> queries = new();
@@ -990,9 +1426,11 @@
     private string currentPlanName = "No Plan";
     private string membershipMessage = "No active plan found for your account.";
     private string? productStatusMessage;
+    private string? orderStatusMessage;
     private string? supportStatusMessage;
     private bool isSupportMaximized;
     private long? expandedQueryId;
+    private SupportTicketFilter activeSupportTicketFilter = SupportTicketFilter.Open;
     private string? pendingScrollAnchor;
 
     private string ProfileEmail => profileEmail;
@@ -1011,6 +1449,14 @@
         : profileEmail.Trim()[0].ToString().ToUpperInvariant();
 
     private string CurrentSectionAnchor => GetSectionHash(activeSection);
+    private SupportQueryDto? SelectedSupportQuery => expandedQueryId.HasValue
+        ? queries.FirstOrDefault(query => query.Id == expandedQueryId.Value)
+        : null;
+    private IEnumerable<SupportQueryDto> FilteredSupportQueries => queries
+        .Where(query => MatchesSupportTicketFilter(query, activeSupportTicketFilter))
+        .OrderByDescending(query => query.CreatedAtUtc);
+    private int OpenSupportQueryCount => queries.Count(query => !IsClosedSupportTicket(query.Status));
+    private int ClosedSupportQueryCount => queries.Count(query => IsClosedSupportTicket(query.Status));
 
     protected override async Task OnInitializedAsync()
     {
@@ -1109,19 +1555,29 @@
         isSupportMaximized = !isSupportMaximized;
     }
 
-    private async Task ToggleQueryThreadAsync(long queryId)
+    private void SelectSupportTicketFilter(SupportTicketFilter filter)
     {
-        if (expandedQueryId == queryId)
-        {
-            expandedQueryId = null;
-            activeQueryMessages.Clear();
-            replyRequest = new CreateSupportQueryMessageRequest();
-            return;
-        }
+        activeSupportTicketFilter = filter;
 
+        var selectedQuery = SelectedSupportQuery;
+        if (selectedQuery is not null && !MatchesSupportTicketFilter(selectedQuery, filter))
+        {
+            CloseQueryThread();
+        }
+    }
+
+    private async Task OpenQueryThreadAsync(long queryId)
+    {
         expandedQueryId = queryId;
         replyRequest = new CreateSupportQueryMessageRequest();
         await LoadThreadMessagesAsync(queryId);
+    }
+
+    private void CloseQueryThread()
+    {
+        expandedQueryId = null;
+        activeQueryMessages.Clear();
+        replyRequest = new CreateSupportQueryMessageRequest();
     }
 
     private async Task LoadThreadMessagesAsync(long queryId)
@@ -1146,21 +1602,34 @@
             return;
         }
 
-        var response = await Http.PostAsJsonAsync($"api/commerce/support/my/{expandedQueryId.Value}/messages", replyRequest);
+        var queryId = expandedQueryId.Value;
+        var wasClosed = IsClosedSupportTicket(SelectedSupportQuery?.Status);
+        var response = await Http.PostAsJsonAsync($"api/commerce/support/my/{queryId}/messages", replyRequest);
         if (!response.IsSuccessStatusCode)
         {
             supportStatusMessage = "Unable to send reply.";
             return;
         }
 
-        supportStatusMessage = "Reply sent.";
+        if (wasClosed)
+        {
+            UpdateSupportQueryStatus(queryId, "Open");
+            activeSupportTicketFilter = SupportTicketFilter.Open;
+            supportStatusMessage = "Reply sent and ticket reopened.";
+        }
+        else
+        {
+            supportStatusMessage = "Reply sent.";
+        }
+
         replyRequest = new CreateSupportQueryMessageRequest();
-        await LoadThreadMessagesAsync(expandedQueryId.Value);
+        await LoadThreadMessagesAsync(queryId);
     }
 
     private async Task LoadDashboardDataAsync()
     {
         productStatusMessage = null;
+        orderStatusMessage = null;
         supportStatusMessage = null;
 
         var ordersTask = Http.GetAsync("api/commerce/orders/my");
@@ -1194,7 +1663,104 @@
             queries.AddRange(payload ?? Enumerable.Empty<SupportQueryDto>());
         }
 
+        var selectedQuery = SelectedSupportQuery;
+        if (expandedQueryId.HasValue && selectedQuery is null)
+        {
+            CloseQueryThread();
+        }
+        else if (selectedQuery is not null)
+        {
+            activeSupportTicketFilter = IsClosedSupportTicket(selectedQuery.Status)
+                ? SupportTicketFilter.Closed
+                : SupportTicketFilter.Open;
+        }
+
         ResolveMembership();
+    }
+
+    private async Task DownloadInvoiceAsync(UserOrderDto order)
+    {
+        if (!CanDownloadInvoice(order))
+        {
+            orderStatusMessage = $"Invoice is available only after order ORD-{order.OrderId} is completed.";
+            return;
+        }
+
+        var quantity = order.Quantity > 0 ? order.Quantity : 1;
+        var unitPrice = order.UnitPrice > 0 ? order.UnitPrice : quantity > 0 ? order.TotalAmount / quantity : order.TotalAmount;
+        var generatedAt = DateTime.Now.ToString("dd MMM yyyy hh:mm tt");
+        var orderedAt = order.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt");
+        var paymentMethod = string.IsNullOrWhiteSpace(order.PaymentMethod) ? "Card" : order.PaymentMethod;
+        var statusLabel = GetOrderStatusLabel(order.Status);
+
+        static string Encode(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+
+        var invoiceHtml = string.Join(Environment.NewLine, new[]
+        {
+            "<!DOCTYPE html>",
+            "<html lang='en'>",
+            "<head>",
+            "  <meta charset='utf-8'>",
+            "  <meta name='viewport' content='width=device-width, initial-scale=1'>",
+            $"  <title>Invoice ORD-{order.OrderId}</title>",
+            "  <style>",
+            "    body{margin:0;padding:32px;background:#f5f0e6;color:#1f2937;font-family:Inter,Arial,sans-serif;}",
+            "    .invoice{max-width:860px;margin:0 auto;background:#ffffff;border-radius:28px;padding:40px;box-shadow:0 24px 70px rgba(15,23,42,0.12);border:1px solid #f0e7d5;}",
+            "    .top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;}",
+            "    .brand{display:inline-flex;align-items:center;gap:12px;font-weight:800;letter-spacing:-0.03em;font-size:22px;}",
+            "    .mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#fbbf24,#f97316);color:#111827;}",
+            "    .label{text-align:right;}",
+            "    .label h1{margin:0 0 8px;font-size:28px;letter-spacing:-0.05em;}",
+            "    .label p,.card span,.billing span,.note{color:#6b7280;font-size:14px;line-height:1.6;}",
+            "    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:28px;}",
+            "    .card,.billing,.summary{border:1px solid #ece5d7;border-radius:18px;padding:16px 18px;background:#faf7f1;}",
+            "    .card strong,.billing strong{display:block;margin-bottom:6px;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#9a6a12;}",
+            "    .billing{margin-bottom:24px;}",
+            "    table{width:100%;border-collapse:collapse;margin-bottom:24px;}",
+            "    th,td{padding:14px 12px;border-bottom:1px solid #ece5d7;text-align:left;font-size:14px;}",
+            "    th{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;}",
+            "    .amount{text-align:right;white-space:nowrap;}",
+            "    .summary-wrap{display:flex;justify-content:flex-end;}",
+            "    .row{display:flex;justify-content:space-between;gap:16px;margin-bottom:10px;font-size:14px;}",
+            "    .row.total{margin-top:14px;padding-top:14px;border-top:1px solid #ece5d7;font-weight:800;font-size:17px;color:#111827;}",
+            "    .note{margin-top:28px;}",
+            "    @media print{body{padding:0;background:#ffffff;}.invoice{box-shadow:none;border:0;}}",
+            "  </style>",
+            "</head>",
+            "<body>",
+            "  <div class='invoice'>",
+            "    <div class='top'>",
+            "      <div class='brand'><div class='mark'>K</div><div>Kohinoorea</div></div>",
+            $"      <div class='label'><h1>Invoice</h1><p>Invoice No: INV-ORD-{order.OrderId}<br>Generated: {Encode(generatedAt)}</p></div>",
+            "    </div>",
+            "    <div class='grid'>",
+            $"      <div class='card'><strong>Order ID</strong><span>ORD-{order.OrderId}</span></div>",
+            $"      <div class='card'><strong>Order Date</strong><span>{Encode(orderedAt)}</span></div>",
+            $"      <div class='card'><strong>Status</strong><span>{Encode(statusLabel)}</span></div>",
+            "    </div>",
+            $"    <div class='billing'><strong>Billed To</strong><span>{Encode(profileEmail)}</span></div>",
+            "    <table>",
+            "      <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th class='amount'>Line Total</th></tr></thead>",
+            "      <tbody>",
+            $"        <tr><td>{Encode(order.ProductName)}</td><td>{quantity}</td><td>{Encode(currency.FormatFromUsd(unitPrice))}</td><td class='amount'>{Encode(currency.FormatFromUsd(order.TotalAmount))}</td></tr>",
+            "      </tbody>",
+            "    </table>",
+            "    <div class='summary-wrap'>",
+            "      <div class='summary'>",
+            $"        <div class='row'><span>Payment Method</span><span>{Encode(paymentMethod)}</span></div>",
+            $"        <div class='row'><span>Subtotal</span><span>{Encode(currency.FormatFromUsd(order.TotalAmount))}</span></div>",
+            $"        <div class='row'><span>Tax</span><span>{Encode(currency.FormatFromUsd(0))}</span></div>",
+            $"        <div class='row total'><span>Total</span><span>{Encode(currency.FormatFromUsd(order.TotalAmount))}</span></div>",
+            "      </div>",
+            "    </div>",
+            "    <p class='note'>This invoice was generated from your Kohinoorea dashboard order history. Keep this file for your records or print it as needed.</p>",
+            "  </div>",
+            "</body>",
+            "</html>"
+        });
+
+        await JS.InvokeVoidAsync("kohinoorDownloadFile", $"invoice-ord-{order.OrderId}.html", invoiceHtml, "text/html;charset=utf-8");
+        orderStatusMessage = $"Invoice downloaded for order ORD-{order.OrderId}.";
     }
 
     private sealed class CartItem
@@ -1239,13 +1805,15 @@
             return;
         }
 
-        supportStatusMessage = "Your query has been sent to admin.";
+        var createdQuery = await response.Content.ReadFromJsonAsync<SupportQueryDto>();
+        supportStatusMessage = "Your ticket has been sent to admin.";
         supportRequest = new CreateSupportQueryRequest();
+        activeSupportTicketFilter = SupportTicketFilter.Open;
         await LoadDashboardDataAsync();
 
-        if (expandedQueryId.HasValue)
+        if (createdQuery is not null)
         {
-            await LoadThreadMessagesAsync(expandedQueryId.Value);
+            await OpenQueryThreadAsync(createdQuery.Id);
         }
     }
 
@@ -1272,13 +1840,73 @@
         var value = status?.Trim().ToLowerInvariant();
         return value switch
         {
+            "completed" => "delivered",
             "delivered" => "delivered",
+            "denied" => "cancelled",
             "cancelled" => "cancelled",
             "closed" => "closed",
             "open" => "open",
             "active" => "open",
             _ => "pending"
         };
+    }
+
+    private static bool CanDownloadInvoice(UserOrderDto order)
+    {
+        var value = order.Status?.Trim().ToLowerInvariant();
+        return value is "completed" or "delivered";
+    }
+
+    private static bool IsClosedSupportTicket(string? status)
+    {
+        return string.Equals(status?.Trim(), "Closed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetOrderStatusLabel(string? status)
+    {
+        return status?.Trim().ToLowerInvariant() switch
+        {
+            "completed" => "Completed",
+            "delivered" => "Delivered",
+            "denied" => "Denied",
+            "cancelled" => "Cancelled",
+            "closed" => "Closed",
+            "open" => "Open",
+            "active" => "Active",
+            _ => "Pending"
+        };
+    }
+
+    private static string GetSupportStatusLabel(string? status)
+    {
+        return IsClosedSupportTicket(status) ? "Closed" : "Open";
+    }
+
+    private static bool MatchesSupportTicketFilter(SupportQueryDto query, SupportTicketFilter filter)
+    {
+        return filter switch
+        {
+            SupportTicketFilter.Closed => IsClosedSupportTicket(query.Status),
+            _ => !IsClosedSupportTicket(query.Status)
+        };
+    }
+
+    private static string GetSupportFilterLabel(SupportTicketFilter filter)
+    {
+        return filter switch
+        {
+            SupportTicketFilter.Closed => "Closed Tickets",
+            _ => "Open Tickets"
+        };
+    }
+
+    private void UpdateSupportQueryStatus(long queryId, string status)
+    {
+        var query = queries.FirstOrDefault(item => item.Id == queryId);
+        if (query is not null)
+        {
+            query.Status = status;
+        }
     }
 
     private void NavigateToBuyProduct(long productId)

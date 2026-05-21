@@ -1,4 +1,5 @@
 using Kohinoorea.Shared.Models.Auth;
+using SqlKata;
 using SqlKata.Execution;
 
 namespace Kohinoorea.Server.Services;
@@ -39,6 +40,35 @@ public sealed class AuthRepository : IAuthRepository
             .GetAsync<AdminUserDto>(cancellationToken: cancellationToken);
 
         return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<AdminLeadNotificationDto>> GetFollowUpCandidatesAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await BuildFollowUpCandidatesQuery()
+            .OrderByDesc("u." + AuthSqlKataSchema.UserColumns.CreatedAtUtc)
+            .GetAsync<AdminLeadNotificationDto>(cancellationToken: cancellationToken);
+
+        return rows.ToList();
+    }
+
+    public async Task<AdminLeadNotificationDto?> GetFollowUpCandidateAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        return await BuildFollowUpCandidatesQuery()
+            .Where("u." + AuthSqlKataSchema.UserColumns.Id, userId)
+            .FirstOrDefaultAsync<AdminLeadNotificationDto>(cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> SetUserActiveAsync(long userId, bool isActive, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Where(AuthSqlKataSchema.UserColumns.Id, userId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.UserColumns.IsActive] = isActive
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
     }
 
     public async Task<long> CreateUserAsync(SignupRequest request, string passwordHash, CancellationToken cancellationToken = default)
@@ -93,5 +123,26 @@ public sealed class AuthRepository : IAuthRepository
             {
                 [AuthSqlKataSchema.UserColumns.LastLoginAtUtc] = lastLoginAtUtc
             }, cancellationToken: cancellationToken);
+    }
+
+    private Query BuildFollowUpCandidatesQuery()
+    {
+        return _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable + " as u")
+            .SelectRaw("u.id as UserId")
+            .SelectRaw("u.full_name as FullName")
+            .SelectRaw("u.email as Email")
+            .SelectRaw("u.phone as Phone")
+            .SelectRaw("u.mt4_broker as Mt4Broker")
+            .SelectRaw("u.created_at_utc as CreatedAtUtc")
+            .SelectRaw("u.last_login_at_utc as LastLoginAtUtc")
+            .SelectRaw("(SELECT TOP 1 s.access_plan FROM signup_submissions s WHERE s.email = u.email ORDER BY s.created_at_utc DESC, s.id DESC) as RequestedPlan")
+            .SelectRaw("(SELECT COUNT(1) FROM orders o WHERE o.user_id = u.id) as TotalOrders")
+            .SelectRaw("(SELECT COUNT(1) FROM orders o WHERE o.user_id = u.id AND o.status = 'Completed') as CompletedOrders")
+            .SelectRaw("(SELECT MAX(o.ordered_at_utc) FROM orders o WHERE o.user_id = u.id) as LastOrderAtUtc")
+            .SelectRaw("(SELECT TOP 1 o.status FROM orders o WHERE o.user_id = u.id ORDER BY o.ordered_at_utc DESC, o.id DESC) as LastOrderStatus")
+            .Where("u." + AuthSqlKataSchema.UserColumns.Role, AuthRoles.User)
+            .Where("u." + AuthSqlKataSchema.UserColumns.IsActive, true)
+            .WhereRaw("(SELECT COUNT(1) FROM orders o WHERE o.user_id = u.id AND o.status = 'Completed') = 0");
     }
 }

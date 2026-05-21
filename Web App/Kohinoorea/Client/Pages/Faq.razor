@@ -1,97 +1,315 @@
 @page "/faq"
 
 @using Kohinoorea.Client.Services
+@using Kohinoorea.Shared.Models.Commerce
 @inject HttpClient Http
 @inject ILocalStorageService LocalStorage
 
-<PageTitle>Faq</PageTitle>
+<PageTitle>FAQ</PageTitle>
 
-<main>
-    <section class="page-hero">
-      <div class="container">
+<style>
+  .faq-premium-shell {
+    background:
+      radial-gradient(circle at top left, rgba(251,191,36,0.14), transparent 28%),
+      radial-gradient(circle at top right, rgba(168,85,247,0.12), transparent 24%);
+  }
+
+  .faq-hero-card {
+    padding: 32px;
+    border-radius: 30px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(135deg, rgba(255,255,255,0.86), rgba(255,255,255,0.72));
+    box-shadow: 0 24px 64px rgba(15,23,42,0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  body[data-theme="dark"] .faq-hero-card {
+    background: linear-gradient(135deg, rgba(15,23,42,0.76), rgba(15,23,42,0.6));
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  }
+
+  .faq-highlight-row {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .faq-highlight-card {
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid rgba(251,191,36,0.18);
+    background: linear-gradient(135deg, rgba(251,191,36,0.1), rgba(249,115,22,0.04));
+  }
+
+  body[data-theme="dark"] .faq-highlight-card {
+    background: linear-gradient(135deg, rgba(251,191,36,0.12), rgba(168,85,247,0.08));
+  }
+
+  .faq-highlight-card strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 16px;
+  }
+
+  .faq-highlight-card span {
+    color: var(--muted, #6b7280);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  .faq-section-card {
+    padding: 28px;
+    border-radius: 30px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(135deg, rgba(255,255,255,0.88), rgba(255,255,255,0.76));
+    box-shadow: 0 24px 64px rgba(15,23,42,0.08);
+    backdrop-filter: blur(18px);
+  }
+
+  body[data-theme="dark"] .faq-section-card {
+    background: linear-gradient(135deg, rgba(15,23,42,0.76), rgba(15,23,42,0.58));
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  }
+
+  .faq-accordion {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .faq-entry {
+    border-radius: 24px;
+    border: 1px solid rgba(148,163,184,0.16);
+    background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.58));
+    overflow: hidden;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  body[data-theme="dark"] .faq-entry {
+    background: linear-gradient(135deg, rgba(30,41,59,0.78), rgba(15,23,42,0.74));
+  }
+
+  .faq-entry.active,
+  .faq-entry:hover {
+    transform: translateY(-2px);
+    border-color: rgba(251,191,36,0.28);
+    box-shadow: 0 18px 40px rgba(15,23,42,0.08);
+  }
+
+  .faq-trigger {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    text-align: left;
+    padding: 22px 24px;
+    cursor: pointer;
+  }
+
+  .faq-trigger strong {
+    display: block;
+    font-size: 18px;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+
+  .faq-trigger span {
+    color: var(--muted, #6b7280);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .faq-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    background: linear-gradient(135deg, #fbbf24, #f97316);
+    box-shadow: 0 12px 28px rgba(251,191,36,0.24);
+    transition: transform 0.2s ease;
+  }
+
+  .faq-entry.active .faq-icon {
+    transform: rotate(45deg);
+  }
+
+  .faq-answer {
+    padding: 0 24px 24px;
+    color: var(--muted, #4b5563);
+    line-height: 1.8;
+    white-space: pre-line;
+  }
+
+  body[data-theme="dark"] .faq-answer,
+  body[data-theme="dark"] .faq-trigger span {
+    color: #cbd5e1;
+  }
+
+  .faq-empty {
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px dashed rgba(148,163,184,0.24);
+    color: var(--muted, #6b7280);
+    line-height: 1.7;
+  }
+
+  @@media (max-width: 960px) {
+    .faq-highlight-row {
+      grid-template-columns: 1fr;
+    }
+
+    .faq-hero-card,
+    .faq-section-card {
+      padding: 22px;
+    }
+
+    .faq-trigger {
+      padding: 18px 18px;
+    }
+
+    .faq-answer {
+      padding: 0 18px 18px;
+    }
+  }
+</style>
+
+<main class="faq-premium-shell">
+  <section class="page-hero">
+    <div class="container">
+      <div class="faq-hero-card">
         <div class="eyebrow">Common questions</div>
         <h1>Answers buyers usually need before they <span class="gradient-text">start</span></h1>
-        <p>This page combines the product FAQ, common support questions, and the refund policy summary from your brief.</p>
-      </div>
-    </section>
+        <p>This page brings together product details, setup guidance, pricing questions, and policy answers in one premium FAQ experience.</p>
 
-    <section class="section">
-      <div class="container faq-grid">
-        <article class="faq-item">
-          <h3>What is Kohinoor EA?</h3>
-          <p>Kohinoor EA is a premium automated trading system developed for MetaTrader 4. It is designed to analyze market conditions, execute trades based on predefined logic, and manage positions with a disciplined algorithmic approach.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Does it work on MT4?</h3>
-          <p>Yes. Kohinoor EA is built specifically for the MetaTrader 4 platform and integrates smoothly with MT4-compatible broker accounts.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Which pair does it support?</h3>
-          <p>Kohinoor EA is optimized for XAUUSD (Gold), one of the most actively traded instruments in the market. It is designed to work with the dynamic nature of gold price movements.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Is it fully automated?</h3>
-          <p>Yes. Once installed and configured, Kohinoor EA can monitor the market, place trades, and manage open positions automatically according to its programmed strategy rules.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Do I need a VPS?</h3>
-          <p>A VPS is not always required, but it is highly recommended for stable 24/5 operation, lower latency, and uninterrupted trading when your personal computer is turned off.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Can I change risk settings?</h3>
-          <p>Yes. Kohinoor EA includes adjustable settings that allow users to customize risk levels and trading preferences based on their own goals and account size.</p>
-        </article>
-        <article class="faq-item">
-          <h3>What pricing plans are available?</h3>
-          <p>Kohinoor EA is available in flexible plans to suit different needs: Monthly (@currency.FormatFromUsd(99m)), Annual (@currency.FormatFromUsd(299m)), and Lifetime - 4 Years (@currency.FormatFromUsd(799m)).</p>
-        </article>
-        <article class="faq-item">
-          <h3>Do you provide support after purchase?</h3>
-          <p>Yes. Support is available after purchase for installation guidance, setup assistance, and general product-related questions to help users get started smoothly.</p>
-        </article>
+        <div class="faq-highlight-row">
+          <div class="faq-highlight-card">
+            <strong>Product clarity</strong>
+            <span>Understand platform support, automation scope, and how Kohinoor EA fits into your workflow.</span>
+          </div>
+          <div class="faq-highlight-card">
+            <strong>Purchase confidence</strong>
+            <span>Review pricing, refunds, and the most common pre-purchase decision points before checkout.</span>
+          </div>
+          <div class="faq-highlight-card">
+            <strong>Support visibility</strong>
+            <span>See how onboarding, setup help, and post-purchase support continue after you join.</span>
+          </div>
+        </div>
       </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="eyebrow">More common questions</div>
-        <h2 class="section-title">Broker, deposit, and refund policy</h2>
-        <p class="section-copy">These answers cover the most common operational and policy questions buyers ask before making a decision.</p>
-        <div class="faq-grid">
-        <article class="faq-item">
-          <h3>Does it work on all brokers?</h3>
-          <p>Kohinoor EA is designed for MT4-compatible broker accounts. Real-world execution can vary based on broker conditions, spreads, execution quality, and account type, so testing on your preferred broker is recommended.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Minimum deposit?</h3>
-          <p>The minimum deposit can depend on the broker, the account type, and the user-selected risk settings. You should define a recommended minimum based on your tested operating range before launch.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Refund policy?</h3>
-          <p>We aim to provide a high-quality product and professional support. Due to the digital nature of Kohinoor EA and instant file delivery, refunds are generally not available once the product has been delivered. However, if you experience a verified technical issue that prevents activation or normal use, please contact our support team. If the issue cannot be resolved within a reasonable time, a refund or replacement may be considered at our discretion.</p>
-        </article>
-        <article class="faq-item">
-          <h3>Chargeback requests</h3>
-          <p>Please contact support before requesting a chargeback so we can assist you promptly.</p>
-        </article>
-      </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container footer-grid">
-      <div><strong>Kohinoor EA</strong></div>
-      <div><p>Answers for buyers covering setup, platform support, pricing structure, and post-purchase guidance.</p></div>
     </div>
-  </footer>
+  </section>
 
+  <section class="section">
+    <div class="container">
+      <div class="faq-section-card">
+        <div class="eyebrow">FAQ library</div>
+        <h2 class="section-title">Premium answers in one place</h2>
+        <p class="section-copy">Open any question below to reveal the full answer.</p>
+
+        @if (DisplayFaqs.Count == 0)
+        {
+          <div class="faq-empty">No FAQs have been published yet. Please check back soon.</div>
+        }
+        else
+        {
+          <div class="faq-accordion">
+            @foreach (var faq in DisplayFaqs)
+            {
+              var isOpen = expandedFaqId == faq.Id;
+              <article class="faq-entry @(isOpen ? "active" : null)">
+                <button class="faq-trigger" type="button" @onclick="() => ToggleFaq(faq.Id)">
+                  <div>
+                    <strong>@faq.Question</strong>
+                    <span>@(isOpen ? "Click to collapse this answer." : "Click to expand this answer.")</span>
+                  </div>
+                  <div class="faq-icon">+</div>
+                </button>
+
+                @if (isOpen)
+                {
+                  <div class="faq-answer">@faq.Answer</div>
+                }
+              </article>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div><strong>Kohinoor EA</strong></div>
+    <div><p>Premium FAQ answers covering setup, platform support, pricing, and post-purchase guidance.</p></div>
+  </div>
+</footer>
 
 @code {
   private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
+  private readonly List<FaqDto> faqItems = new();
+  private long? expandedFaqId;
+
+  private IReadOnlyList<FaqDto> DisplayFaqs => faqItems.Count > 0 ? faqItems : GetFallbackFaqs();
 
   protected override async Task OnInitializedAsync()
   {
     currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+
+    try
+    {
+      var response = await Http.GetAsync("api/commerce/faqs");
+      if (response.IsSuccessStatusCode)
+      {
+        var payload = await response.Content.ReadFromJsonAsync<List<FaqDto>>();
+        if (payload is { Count: > 0 })
+        {
+          faqItems.Clear();
+          faqItems.AddRange(payload);
+        }
+      }
+    }
+    catch
+    {
+    }
+
+    expandedFaqId = DisplayFaqs.FirstOrDefault()?.Id;
+  }
+
+  private void ToggleFaq(long faqId)
+  {
+    expandedFaqId = expandedFaqId == faqId ? null : faqId;
+  }
+
+  private List<FaqDto> GetFallbackFaqs()
+  {
+    return new List<FaqDto>
+    {
+      new() { Id = 1, Question = "What is Kohinoor EA?", Answer = "Kohinoor EA is a premium automated trading system developed for MetaTrader 4. It is designed to analyze market conditions, execute trades based on predefined logic, and manage positions with a disciplined algorithmic approach." },
+      new() { Id = 2, Question = "Does it work on MT4?", Answer = "Yes. Kohinoor EA is built specifically for the MetaTrader 4 platform and integrates smoothly with MT4-compatible broker accounts." },
+      new() { Id = 3, Question = "Which pair does it support?", Answer = "Kohinoor EA is optimized for XAUUSD (Gold), one of the most actively traded instruments in the market. It is designed to work with the dynamic nature of gold price movements." },
+      new() { Id = 4, Question = "Is it fully automated?", Answer = "Yes. Once installed and configured, Kohinoor EA can monitor the market, place trades, and manage open positions automatically according to its programmed strategy rules." },
+      new() { Id = 5, Question = "Do I need a VPS?", Answer = "A VPS is not always required, but it is highly recommended for stable 24/5 operation, lower latency, and uninterrupted trading when your personal computer is turned off." },
+      new() { Id = 6, Question = "Can I change risk settings?", Answer = "Yes. Kohinoor EA includes adjustable settings that allow users to customize risk levels and trading preferences based on their own goals and account size." },
+      new() { Id = 7, Question = "What pricing plans are available?", Answer = $"Kohinoor EA is available in flexible plans to suit different needs: Monthly ({currency.FormatFromUsd(99m)}), Annual ({currency.FormatFromUsd(299m)}), and Lifetime - 4 Years ({currency.FormatFromUsd(799m)})." },
+      new() { Id = 8, Question = "Do you provide support after purchase?", Answer = "Yes. Support is available after purchase for installation guidance, setup assistance, and general product-related questions to help users get started smoothly." },
+      new() { Id = 9, Question = "Does it work on all brokers?", Answer = "Kohinoor EA is designed for MT4-compatible broker accounts. Real-world execution can vary based on broker conditions, spreads, execution quality, and account type, so testing on your preferred broker is recommended." },
+      new() { Id = 10, Question = "Minimum deposit?", Answer = "The minimum deposit can depend on the broker, the account type, and the user-selected risk settings. You should define a recommended minimum based on your tested operating range before launch." },
+      new() { Id = 11, Question = "Refund policy?", Answer = "We aim to provide a high-quality product and professional support. Due to the digital nature of Kohinoor EA and instant file delivery, refunds are generally not available once the product has been delivered. However, if you experience a verified technical issue that prevents activation or normal use, please contact our support team. If the issue cannot be resolved within a reasonable time, a refund or replacement may be considered at our discretion." },
+      new() { Id = 12, Question = "Chargeback requests", Answer = "Please contact support before requesting a chargeback so we can assist you promptly." }
+    };
   }
 }

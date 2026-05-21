@@ -172,6 +172,8 @@ public sealed class CommerceRepository : ICommerceRepository
             .SelectRaw("o.id as OrderId")
             .SelectRaw("o.product_id as ProductId")
             .SelectRaw("p.name as ProductName")
+            .SelectRaw("o.unit_price as UnitPrice")
+            .SelectRaw("o.quantity as Quantity")
             .SelectRaw("o.ordered_at_utc as OrderedAtUtc")
             .SelectRaw("o.total_amount as TotalAmount")
             .SelectRaw("o.payment_method as PaymentMethod")
@@ -181,6 +183,87 @@ public sealed class CommerceRepository : ICommerceRepository
             .GetAsync<UserOrderDto>(cancellationToken: cancellationToken);
 
         return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<FaqDto>> GetFaqsAsync(bool onlyActive, CancellationToken cancellationToken = default)
+    {
+        var query = _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .SelectRaw("id as Id")
+            .SelectRaw("question as Question")
+            .SelectRaw("answer as Answer")
+            .SelectRaw("display_order as DisplayOrder")
+            .SelectRaw("is_active as IsActive")
+            .SelectRaw("created_at_utc as CreatedAtUtc")
+            .OrderBy(AuthSqlKataSchema.FaqColumns.DisplayOrder)
+            .OrderByDesc(AuthSqlKataSchema.FaqColumns.CreatedAtUtc);
+
+        if (onlyActive)
+        {
+            query = query.Where(AuthSqlKataSchema.FaqColumns.IsActive, true);
+        }
+
+        var rows = await query.GetAsync<FaqDto>(cancellationToken: cancellationToken);
+        return rows.ToList();
+    }
+
+    public async Task<FaqDto?> GetFaqByIdAsync(long faqId, CancellationToken cancellationToken = default)
+    {
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .SelectRaw("id as Id")
+            .SelectRaw("question as Question")
+            .SelectRaw("answer as Answer")
+            .SelectRaw("display_order as DisplayOrder")
+            .SelectRaw("is_active as IsActive")
+            .SelectRaw("created_at_utc as CreatedAtUtc")
+            .Where(AuthSqlKataSchema.FaqColumns.Id, faqId)
+            .FirstOrDefaultAsync<FaqDto>(cancellationToken: cancellationToken);
+    }
+
+    public async Task<long> CreateFaqAsync(CreateFaqRequest request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .InsertGetIdAsync<long>(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.FaqColumns.Question] = request.Question.Trim(),
+                [AuthSqlKataSchema.FaqColumns.Answer] = request.Answer.Trim(),
+                [AuthSqlKataSchema.FaqColumns.DisplayOrder] = request.DisplayOrder,
+                [AuthSqlKataSchema.FaqColumns.IsActive] = request.IsActive,
+                [AuthSqlKataSchema.FaqColumns.CreatedAtUtc] = now
+            }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> UpdateFaqAsync(long faqId, CreateFaqRequest request, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .Where(AuthSqlKataSchema.FaqColumns.Id, faqId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.FaqColumns.Question] = request.Question.Trim(),
+                [AuthSqlKataSchema.FaqColumns.Answer] = request.Answer.Trim(),
+                [AuthSqlKataSchema.FaqColumns.DisplayOrder] = request.DisplayOrder,
+                [AuthSqlKataSchema.FaqColumns.IsActive] = request.IsActive
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
+    public async Task<bool> SetFaqActiveAsync(long faqId, bool isActive, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .Where(AuthSqlKataSchema.FaqColumns.Id, faqId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.FaqColumns.IsActive] = isActive
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
     }
 
     public async Task<IReadOnlyList<SupportQueryDto>> GetSupportQueriesAsync(long userId, CancellationToken cancellationToken = default)
@@ -284,6 +367,19 @@ public sealed class CommerceRepository : ICommerceRepository
                 [AuthSqlKataSchema.SupportQueryMessageColumns.Message] = message.Trim(),
                 [AuthSqlKataSchema.SupportQueryMessageColumns.CreatedAtUtc] = now
             }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> UpdateSupportQueryStatusAsync(long queryId, string status, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.SupportQueriesTable)
+            .Where(AuthSqlKataSchema.SupportQueryColumns.Id, queryId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.SupportQueryColumns.Status] = status
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
     }
 
     public async Task<IReadOnlyList<OrderTraceDto>> GetOrderTraceAsync(CancellationToken cancellationToken = default)
