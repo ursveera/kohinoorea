@@ -10,16 +10,7 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddBlazoredLocalStorage();
-
-var apiBaseAddress = builder.HostEnvironment.BaseAddress;
-//if (Uri.TryCreate(apiBaseAddress, UriKind.Absolute, out var hostUri))
-//{
-//    if (hostUri.Port == 5010 || hostUri.Port == 7025)
-//    {
-//        apiBaseAddress = $"https://{hostUri.Host}:7023/";
-//    }
-//}
-
+var apiBaseAddress = builder.Configuration["ApiBaseAddress"];
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseAddress) });
 
 var host = builder.Build();

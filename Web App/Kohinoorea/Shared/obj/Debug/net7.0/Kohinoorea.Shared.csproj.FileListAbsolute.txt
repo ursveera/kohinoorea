@@ -10,3 +10,9 @@ F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net7.0\Kohinoorea.Shared.dll
 F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net7.0\refint\Kohinoorea.Shared.dll
 F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net7.0\Kohinoorea.Shared.pdb
 F:\Jameer\Web App\Kohinoorea\Shared\obj\Debug\net7.0\ref\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\Shared\.codex-build\Kohinoorea.Shared.deps.json
+F:\Jameer\Web App\Kohinoorea\Shared\.codex-build\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\Shared\.codex-build\Kohinoorea.Shared.pdb
+F:\Jameer\Web App\Kohinoorea\.build-temp\server-bin\Kohinoorea.Shared.deps.json
+F:\Jameer\Web App\Kohinoorea\.build-temp\server-bin\Kohinoorea.Shared.dll
+F:\Jameer\Web App\Kohinoorea\.build-temp\server-bin\Kohinoorea.Shared.pdb

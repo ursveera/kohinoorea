@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kohinoorea.Shared")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a65ca132f1d1a267a79c8972809655972eb3023")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0890990dc5fcf80a2d5e5518cbdb27b1d5dedc4e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kohinoorea.Shared")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kohinoorea.Shared")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

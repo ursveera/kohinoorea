@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.6.11723.189 insiders
+VisualStudioVersion = 18.6.11723.189
 MinimumVisualStudioVersion = 16.0.0.0
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kohinoorea.Server", "Server\Kohinoorea.Server.csproj", "{65948F08-F41E-46EC-BD2B-B6D190293FC0}"
 EndProject

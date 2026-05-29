@@ -24,7 +24,13 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ClientCors", policy =>
     {
         policy
-            .WithOrigins("https://localhost:7023")
+            .WithOrigins("https://localhost:7023", 
+            "https://kohinoorea.com",
+            "https://kohinoorea.com", 
+            "http://dev-kohinoorea.kohinoorea.com",
+            "https://dev-kohinoorea.kohinoorea.com", 
+            "http://apikohinoorea.kohinoorea.com", 
+            "http://dev-api-kohinoorea.kohinoorea.com")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
