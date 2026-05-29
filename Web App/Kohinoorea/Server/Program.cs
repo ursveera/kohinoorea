@@ -1,11 +1,14 @@
 using Dapper;
 using Kohinoorea.Client.Services;
+using Kohinoorea.Server.Options;
 using Kohinoorea.Server.Middleware;
 using Kohinoorea.Server.Services;
+using FirebaseAdmin;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
+using Google.Apis.Auth.OAuth2;
 using SqlKata.Compilers;
 using SqlKata.Execution;
 using System.Text;
@@ -16,15 +19,17 @@ DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // Add services to the container.
 
-builder.Services.AddControllersWithViews();
-builder.Services.AddRazorPages();
+builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ClientCors", policy =>
     {
         policy
-            .WithOrigins("https://localhost:7023", 
+            .WithOrigins(
+            "http://localhost:5010",
+            "https://localhost:5010",
+            "https://localhost:7023",
             "https://kohinoorea.com",
             "https://kohinoorea.com", 
             "http://dev-kohinoorea.kohinoorea.com",
@@ -32,7 +37,8 @@ builder.Services.AddCors(options =>
             "http://apikohinoorea.kohinoorea.com", 
             "http://dev-api-kohinoorea.kohinoorea.com")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -71,13 +77,45 @@ builder.Services.AddScoped<IEmailDeliveryService, SmtpEmailDeliveryService>();
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddSingleton<IPasswordHasher<string>, PasswordHasher<string>>();
 
+builder.Services.Configure<FirebaseOptions>(
+    builder.Configuration.GetSection("Firebase"));
+
+builder.Services.Configure<StripeOptions>(
+    builder.Configuration.GetSection("Stripe"));
+
+builder.Services.Configure<PaymentOptions>(
+    builder.Configuration.GetSection("Payment"));
+
+builder.Services.Configure<PayPalOptions>(
+    builder.Configuration.GetSection("PayPal"));
+
 builder.Services.Configure<CurrencyPricingOptions>(
     builder.Configuration.GetSection("CurrencyPricing"));
 
 builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient<CurrencyRateService>();
+builder.Services.AddHttpClient<PayPalCheckoutService>();
 var app = builder.Build();
+
+// Firebase Admin SDK (used to mint custom tokens for client-side Firebase Auth)
+try
+{
+    var firebaseOptions = builder.Configuration.GetSection("Firebase").Get<FirebaseOptions>() ?? new FirebaseOptions();
+    var serviceAccountPath = firebaseOptions.ServiceAccountPath ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_PATH");
+    if (!string.IsNullOrWhiteSpace(serviceAccountPath))
+    {
+        FirebaseApp.Create(new AppOptions
+        {
+            Credential = GoogleCredential.FromFile(serviceAccountPath),
+            ProjectId = firebaseOptions.ProjectId
+        });
+    }
+}
+catch
+{
+    // Best-effort: app still runs without Firebase, but /api/firebase/token will fail.
+}
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
@@ -94,17 +132,12 @@ else
 
 app.UseHttpsRedirection();
 
-app.UseBlazorFrameworkFiles();
-app.UseStaticFiles();
-
 app.UseRouting();
 app.UseCors("ClientCors");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapRazorPages();
 app.MapControllers();
-app.MapFallbackToFile("index.html");
 app.MapGet("/api/currency/rate/{currencyCode}",
     async (
         string currencyCode,

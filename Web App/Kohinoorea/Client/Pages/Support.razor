@@ -1,0 +1,429 @@
+@page "/support"
+@using System.IdentityModel.Tokens.Jwt
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Web
+@using Blazored.LocalStorage
+@implements IAsyncDisposable
+
+<PageTitle>Support</PageTitle>
+
+<main class="support-shell">
+  <div class="support-container">
+    <header class="support-header">
+      <div>
+        <div class="eyebrow">Live Support</div>
+        <h1>Support Chat</h1>
+        <p class="muted">Message support in real-time. Admin replies appear instantly.</p>
+      </div>
+      <div class="header-meta">
+        @if (!string.IsNullOrWhiteSpace(roomId))
+        {
+          <span class="pill">Room: @roomId</span>
+        }
+        <span class="pill">@currentRoleLabel</span>
+      </div>
+    </header>
+
+    @if (!isReady)
+    {
+      <div class="panel">Loading chat…</div>
+    }
+    else if (!isAuthed)
+    {
+      <div class="panel">
+        <h3>Login required</h3>
+        <p class="muted">Please login to start a support chat.</p>
+        <a class="btn" href="/login">Go to Login</a>
+      </div>
+    }
+    else
+    {
+      <div class="layout">
+        @if (isAdmin)
+        {
+          <aside class="rooms">
+            <div class="rooms-title">Active Rooms</div>
+            <div class="rooms-list">
+              @if (rooms.Count == 0)
+              {
+                <div class="muted" style="padding:10px 12px;">No rooms yet.</div>
+              }
+              else
+              {
+                @foreach (var r in rooms)
+                {
+                  <button type="button"
+                          class="room @(string.Equals(r.RoomId, roomId, StringComparison.OrdinalIgnoreCase) ? "active" : null)"
+                          @onclick="() => SwitchRoomAsync(r.RoomId)">
+                    <div class="room-id">@r.RoomId</div>
+                    @if (!string.IsNullOrWhiteSpace(r.LastMessage))
+                    {
+                      <div class="room-last">@r.LastMessage</div>
+                    }
+                  </button>
+                }
+              }
+            </div>
+            <button type="button" class="btn-secondary" @onclick="ReloadRoomsAsync">Refresh rooms</button>
+          </aside>
+        }
+
+        <section class="chat panel">
+          <div class="chat-stream" id="support-chat-stream">
+            @if (messages.Count == 0)
+            {
+              <div class="muted" style="padding:14px;">No messages yet. Say hello.</div>
+            }
+            else
+            {
+              @foreach (var m in messages)
+              {
+                var mine = string.Equals(m.ClientId, clientId, StringComparison.OrdinalIgnoreCase);
+                <div class="msg @(mine ? "mine" : "theirs")">
+                  <div class="msg-meta">
+                    <strong>@(string.IsNullOrWhiteSpace(m.SenderName) ? m.SenderRole : m.SenderName)</strong>
+                    <span class="muted">@FormatTime(m.CreatedAt)</span>
+                  </div>
+                  <div class="msg-body">@m.Text</div>
+                </div>
+              }
+            }
+          </div>
+
+          <div class="typing">
+            @if (!string.IsNullOrWhiteSpace(typingLine))
+            {
+              <span>@typingLine</span>
+            }
+          </div>
+
+          <div class="composer">
+            <input class="composer-input"
+                   placeholder="Type a message…"
+                   value="@draft"
+                   @oninput="OnDraftInput"
+                   @onkeydown="HandleKeyDown"
+                   disabled="@isSending" />
+            <button class="btn" type="button" @onclick="SendAsync" disabled="@isSending">Send</button>
+          </div>
+        </section>
+      </div>
+    }
+  </div>
+</main>
+
+<style>
+  .support-shell { min-height: calc(100vh - 70px); padding: 22px 18px; }
+  .support-container { max-width: 1050px; margin: 0 auto; color: inherit; }
+  .support-header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom: 16px; }
+  .eyebrow { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; color: #f59e0b; }
+  h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -0.04em; }
+  .muted { opacity: .72; }
+  .header-meta { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .pill { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); }
+  body[data-theme="light"] .pill { border-color: rgba(0,0,0,.12); background: rgba(0,0,0,.04); }
+  .layout { display:grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: start; }
+  @@media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+  .panel { border-radius: 18px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); padding: 14px; }
+  body[data-theme="light"] .panel { border-color: rgba(0,0,0,.10); background: rgba(255,255,255,.8); }
+  .rooms { position: sticky; top: 12px; }
+  .rooms-title { font-weight: 900; margin-bottom: 10px; }
+  .rooms-list { display:flex; flex-direction:column; gap:8px; max-height: 60vh; overflow:auto; padding-right: 4px; }
+  .room { text-align:left; border-radius: 14px; border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); padding: 10px 12px; cursor:pointer; }
+  body[data-theme="light"] .room { border-color: rgba(0,0,0,.10); background: rgba(0,0,0,.03); }
+  .room.active { border-color: rgba(251,191,36,.4); box-shadow: 0 0 0 1px rgba(251,191,36,.25) inset; }
+  .room-id { font-weight: 900; font-size: 12px; }
+  .room-last { font-size: 12px; margin-top: 4px; opacity: .78; }
+  .btn, .btn-secondary { border: none; border-radius: 14px; padding: 10px 14px; font-weight: 900; cursor:pointer; }
+  .btn { background: linear-gradient(135deg,#f59e0b,#fb923c); color: #111827; }
+  .btn-secondary { width:100%; margin-top: 10px; background: rgba(255,255,255,.06); color: inherit; border: 1px solid rgba(255,255,255,.12); }
+  body[data-theme="light"] .btn-secondary { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.10); }
+  .chat { padding: 0; overflow:hidden; }
+  .chat-stream { padding: 14px; height: 58vh; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width: 80%; border-radius: 16px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); }
+  body[data-theme="light"] .msg { border-color: rgba(0,0,0,.10); background: rgba(0,0,0,.03); }
+  .msg.mine { margin-left: auto; border-color: rgba(128,90,213,.35); background: rgba(128,90,213,.13); }
+  .msg-meta { display:flex; justify-content:space-between; gap: 10px; font-size: 12px; margin-bottom: 6px; }
+  .msg-body { white-space: pre-wrap; word-break: break-word; }
+  .typing { min-height: 22px; padding: 6px 14px; font-size: 12px; opacity: .8; border-top: 1px solid rgba(255,255,255,.10); }
+  body[data-theme="light"] .typing { border-top-color: rgba(0,0,0,.08); }
+  .composer { display:flex; gap: 10px; padding: 12px 14px; border-top: 1px solid rgba(255,255,255,.10); }
+  body[data-theme="light"] .composer { border-top-color: rgba(0,0,0,.08); }
+  .composer-input { flex: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.18); color: inherit; padding: 10px 12px; outline: none; }
+  body[data-theme="light"] .composer-input { background: rgba(255,255,255,.9); border-color: rgba(0,0,0,.12); }
+</style>
+
+@code {
+  public sealed class ChatMessage
+  {
+    public string Id { get; set; } = string.Empty;
+    public string Text { get; set; } = string.Empty;
+    public string SenderRole { get; set; } = "user";
+    public string SenderName { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
+    public long? CreatedAt { get; set; }
+  }
+
+  public sealed class TypingUser
+  {
+    public string ClientId { get; set; } = string.Empty;
+    public string Role { get; set; } = "user";
+    public string DisplayName { get; set; } = string.Empty;
+  }
+
+  private sealed class SupportRoom
+  {
+    public string RoomId { get; set; } = string.Empty;
+    public string LastMessage { get; set; } = string.Empty;
+    public object? UpdatedAt { get; set; }
+  }
+
+  private IJSObjectReference? chatModule;
+  private IJSObjectReference? chatInstance;
+  private DotNetObjectReference<Support>? dotNetRef;
+
+  private readonly List<ChatMessage> messages = new();
+  private readonly List<SupportRoom> rooms = new();
+
+  private bool isReady;
+  private bool isAuthed;
+  private bool isAdmin;
+  private bool isSending;
+  private string currentRoleLabel = "User";
+
+  private string roomId = string.Empty;
+  private string clientId = string.Empty;
+  private string displayName = "User";
+
+  private string draft = string.Empty;
+  private string typingLine = string.Empty;
+  private DateTime lastTypingPingUtc = DateTime.MinValue;
+
+  [Inject] private IJSRuntime JS { get; set; } = default!;
+  [Inject] private ILocalStorageService LocalStorage { get; set; } = default!;
+
+  protected override async Task OnInitializedAsync()
+  {
+    dotNetRef = DotNetObjectReference.Create(this);
+
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+    if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+    {
+      isAuthed = false;
+      isReady = true;
+      return;
+    }
+
+    isAuthed = true;
+    (roomId, displayName, isAdmin) = ResolveIdentity(token);
+    currentRoleLabel = isAdmin ? "Admin" : "User";
+
+    chatModule = await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/firebase-support-chat.js");
+
+    if (isAdmin)
+    {
+      await ReloadRoomsAsync();
+      if (rooms.Count > 0 && string.IsNullOrWhiteSpace(roomId))
+      {
+        roomId = rooms[0].RoomId;
+      }
+      else if (string.IsNullOrWhiteSpace(roomId))
+      {
+        roomId = "admin";
+      }
+    }
+
+    await StartRoomAsync(roomId);
+    isReady = true;
+  }
+
+  private async Task ReloadRoomsAsync()
+  {
+    if (chatModule is null) return;
+    try
+    {
+      var list = await chatModule.InvokeAsync<List<SupportRoom>>("listSupportRooms");
+      rooms.Clear();
+      rooms.AddRange(list ?? new List<SupportRoom>());
+    }
+    catch
+    {
+      rooms.Clear();
+    }
+  }
+
+  private async Task SwitchRoomAsync(string newRoomId)
+  {
+    if (string.IsNullOrWhiteSpace(newRoomId)) return;
+    roomId = newRoomId.Trim();
+    await StartRoomAsync(roomId);
+  }
+
+  private async Task StartRoomAsync(string newRoomId)
+  {
+    if (chatModule is null || dotNetRef is null) return;
+
+    await DisposeChatAsync();
+    messages.Clear();
+    typingLine = string.Empty;
+    StateHasChanged();
+
+    var options = new
+    {
+      clientId = (string?)null,
+      role = isAdmin ? "admin" : "user",
+      displayName = displayName
+    };
+
+    chatInstance = await chatModule.InvokeAsync<IJSObjectReference>(
+      "createSupportChat",
+      dotNetRef,
+      newRoomId,
+      options);
+
+    clientId = await chatInstance.InvokeAsync<string>("getClientId");
+  }
+
+  private async Task DisposeChatAsync()
+  {
+    if (chatInstance is not null)
+    {
+      try { await chatInstance.InvokeVoidAsync("dispose"); } catch { }
+      try { await chatInstance.DisposeAsync(); } catch { }
+      chatInstance = null;
+    }
+  }
+
+  [JSInvokable]
+  public Task OnMessage(ChatMessage message)
+  {
+    if (message is null || string.IsNullOrWhiteSpace(message.Id)) return Task.CompletedTask;
+    if (messages.Any(m => m.Id == message.Id)) return Task.CompletedTask;
+    messages.Add(message);
+    _ = InvokeAsync(async () =>
+    {
+      StateHasChanged();
+      await JS.InvokeVoidAsync("eval", "document.getElementById('support-chat-stream')?.scrollTo({top: 1e9, behavior: 'smooth'})");
+    });
+    return Task.CompletedTask;
+  }
+
+  [JSInvokable]
+  public Task OnTyping(List<TypingUser> typing)
+  {
+    if (typing is null || typing.Count == 0)
+    {
+      typingLine = string.Empty;
+    }
+    else
+    {
+      var names = typing
+        .Select(t => string.IsNullOrWhiteSpace(t.DisplayName) ? t.Role : t.DisplayName)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Take(2)
+        .ToList();
+
+      typingLine = names.Count switch
+      {
+        1 => $"{names[0]} is typing…",
+        _ => "Multiple people are typing…"
+      };
+    }
+
+    _ = InvokeAsync(StateHasChanged);
+    return Task.CompletedTask;
+  }
+
+  private async Task SendAsync()
+  {
+    if (chatInstance is null) return;
+    var text = draft.Trim();
+    if (string.IsNullOrWhiteSpace(text)) return;
+
+    isSending = true;
+    try
+    {
+      draft = string.Empty;
+      await chatInstance.InvokeVoidAsync("sendMessage", text);
+      await chatInstance.InvokeVoidAsync("setTyping", false);
+    }
+    finally
+    {
+      isSending = false;
+    }
+  }
+
+  private async Task OnDraftInput(ChangeEventArgs e)
+  {
+    draft = e.Value?.ToString() ?? string.Empty;
+
+    if (chatInstance is null) return;
+
+    var now = DateTime.UtcNow;
+    if (now - lastTypingPingUtc < TimeSpan.FromSeconds(2))
+    {
+      return;
+    }
+
+    lastTypingPingUtc = now;
+    try
+    {
+      await chatInstance.InvokeVoidAsync("setTyping", !string.IsNullOrWhiteSpace(draft));
+    }
+    catch { }
+  }
+
+  private async Task HandleKeyDown(KeyboardEventArgs e)
+  {
+    if (e.Key == "Enter" && !e.ShiftKey)
+    {
+      await SendAsync();
+    }
+  }
+
+  private static string FormatTime(long? createdAt)
+  {
+    if (!createdAt.HasValue || createdAt.Value <= 0) return string.Empty;
+    var dt = DateTimeOffset.FromUnixTimeMilliseconds(createdAt.Value).ToLocalTime();
+    return dt.ToString("dd MMM, HH:mm");
+  }
+
+  private static bool IsTokenExpired(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    if (!handler.CanReadToken(token)) return true;
+    var jwt = handler.ReadJwtToken(token);
+    return jwt.ValidTo <= DateTime.UtcNow;
+  }
+
+  private static (string RoomId, string DisplayName, bool IsAdmin) ResolveIdentity(string token)
+  {
+    var handler = new JwtSecurityTokenHandler();
+    var jwt = handler.ReadJwtToken(token);
+
+    var role = jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "role", StringComparison.OrdinalIgnoreCase))?.Value;
+    var isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+    var userId = jwt.Claims.FirstOrDefault(c => c.Type.EndsWith("/nameidentifier", StringComparison.OrdinalIgnoreCase))?.Value
+      ?? jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "sub", StringComparison.OrdinalIgnoreCase))?.Value
+      ?? "unknown";
+
+    var name = jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "name", StringComparison.OrdinalIgnoreCase))?.Value
+      ?? jwt.Claims.FirstOrDefault(c => c.Type.EndsWith("/name", StringComparison.OrdinalIgnoreCase))?.Value
+      ?? jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "email", StringComparison.OrdinalIgnoreCase))?.Value
+      ?? (isAdmin ? "Admin" : "User");
+
+    return (RoomId: userId, DisplayName: name, IsAdmin: isAdmin);
+  }
+
+  public async ValueTask DisposeAsync()
+  {
+    await DisposeChatAsync();
+    if (chatModule is not null)
+    {
+      try { await chatModule.DisposeAsync(); } catch { }
+      chatModule = null;
+    }
+    dotNetRef?.Dispose();
+  }
+}

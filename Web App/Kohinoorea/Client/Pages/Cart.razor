@@ -284,6 +284,32 @@
     font-size: 11.5px; color: #7eb8f7; line-height: 1.6; margin-top: 10px;
   }
 
+  /* ── Payment method selector ──────────────────── */
+  .ct-pay-methods { margin-top: 10px; }
+  .ct-pay-title { color: var(--ct-muted); font-size: 12.5px; margin-bottom: 8px; font-weight: 800; }
+  .ct-pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @@media (max-width: 520px){ .ct-pay-grid { grid-template-columns: 1fr; } }
+  .ct-pay-btn { position: relative; display: block; cursor: pointer; user-select: none; }
+  .ct-pay-btn input { position: absolute; opacity: 0; pointer-events: none; }
+  .ct-pay-btn span {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 44px; border-radius: 14px;
+    background: rgba(0,0,0,.18);
+    border: 1px solid var(--ct-sec-border);
+    color: var(--ct-sec-text);
+    font-weight: 900; letter-spacing: .01em;
+    transition: transform .12s ease, background .2s, border-color .2s, box-shadow .2s, color .2s;
+  }
+  .ct-pay-btn span small { font-weight: 800; color: var(--ct-muted); letter-spacing: .02em; }
+  .ct-pay-btn:hover span { transform: translateY(-1px); border-color: rgba(251,191,36,.35); }
+  .ct-pay-btn input:checked + span {
+    background: linear-gradient(180deg, rgba(251,191,36,.16), rgba(168,85,247,.10));
+    border-color: rgba(251,191,36,.45);
+    box-shadow: 0 10px 26px rgba(0,0,0,.22), 0 0 0 4px rgba(251,191,36,.08);
+    color: var(--ct-text);
+  }
+  .ct-pay-btn input:checked + span small { color: var(--ct-text); opacity: .75; }
+
   .ct-status {
     padding: 11px 14px; border-radius: 12px;
     font-size: 13px; font-weight: 600; margin-top: 10px; text-align: center;
@@ -463,16 +489,15 @@ else
           @foreach (var item in cartItems)
           {
             var raw = item.Description ?? string.Empty;
-            var summaryMatch = System.Text.RegularExpressions.Regex.Match(raw, @"<p>(.*?)</p>", System.Text.RegularExpressions.RegexOptions.Singleline);
-            var summary = summaryMatch.Success ? currency.ReplacePricesInTextFromUsd(summaryMatch.Groups[1].Value.Trim()) : string.Empty;
+            var summary = ExtractCartSummary(raw);
             var features = System.Text.RegularExpressions.Regex.Matches(raw, @"<span>(.*?)</span>", System.Text.RegularExpressions.RegexOptions.Singleline)
-                               .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
+                               .Select(m => StripHtml(m.Groups[1].Value.Trim()))
                                .Where(f => f.Length > 0)
                                .ToList();
             <div class="ct-item">
               <div>
                 <div class="ct-item-name">@item.Name</div>
-                @if (!string.IsNullOrEmpty(summary))
+                @if (!string.IsNullOrWhiteSpace(summary))
                 {
                   <div class="ct-item-desc">@summary</div>
                 }
@@ -492,7 +517,7 @@ else
                 </div>
               </div>
               <div class="ct-item-right">
-                <div class="ct-item-price">@currency.FormatFromUsd(item.UnitPrice * item.Quantity)</div>
+                <div class="ct-item-price">@CurrencyContext.FormatPriceForCountry(item.UnitPrice * item.Quantity, "US")</div>
                 <button class="ct-remove-btn" type="button" @onclick="() => RemoveItem(item.ProductId)">Remove</button>
               </div>
             </div>
@@ -509,7 +534,7 @@ else
         {
           <div class="ct-summary-line">
             <span>@item.Name × @item.Quantity</span>
-            <strong>@currency.FormatFromUsd(item.UnitPrice * item.Quantity)</strong>
+            <strong>@CurrencyContext.FormatPriceForCountry(item.UnitPrice * item.Quantity, "US")</strong>
           </div>
         }
 
@@ -517,7 +542,7 @@ else
           <div>
             <div class="ct-total-label">Total</div>
           </div>
-          <div class="ct-total-value">@currency.FormatFromUsd(TotalPrice)</div>
+          <div class="ct-total-value">@CurrencyContext.FormatPriceForCountry(TotalPrice, "US")</div>
         </div>
 
         @if (!string.IsNullOrEmpty(statusMessage))
@@ -530,6 +555,20 @@ else
           <button class="ct-btn-primary" type="button" @onclick="ProceedToCheckoutAsync" disabled="@isSubmitting">
             @(isSubmitting ? "Processing..." : $"Buy {cartItems.Count} Item{(cartItems.Count == 1 ? string.Empty : "s")}")
           </button>
+
+          <div class="ct-pay-methods">
+            <div class="ct-pay-title">Choose payment method</div>
+            <div class="ct-pay-grid">
+              <label class="ct-pay-btn">
+                <input type="radio" name="payMethod" value="Stripe" checked="@(selectedProvider == "Stripe")" @onchange="OnProviderChanged" />
+                <span>Stripe <small>(Card)</small></span>
+              </label>
+              <label class="ct-pay-btn">
+                <input type="radio" name="payMethod" value="PayPal" checked="@(selectedProvider == "PayPal")" @onchange="OnProviderChanged" />
+                <span>PayPal <small>(Wallet)</small></span>
+              </label>
+            </div>
+          </div>
         }
         else
         {
@@ -575,11 +614,24 @@ else
   private string statusClass = string.Empty;
   private bool isSubmitting;
   private bool orderSuccess;
+  private string selectedProvider = "Stripe";
   private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   private decimal TotalPrice => cartItems.Sum(i => i.UnitPrice * i.Quantity);
 
   private const string CartKey = "kohinoor_cart";
+
+  private void OnProviderChanged(ChangeEventArgs e)
+  {
+    var value = e?.Value?.ToString();
+    if (string.Equals(value, "PayPal", StringComparison.OrdinalIgnoreCase))
+    {
+      selectedProvider = "PayPal";
+      return;
+    }
+
+    selectedProvider = "Stripe";
+  }
 
   protected override async Task OnInitializedAsync()
   {
@@ -587,6 +639,38 @@ else
     var saved = await LocalStorage.GetItemAsync<List<CartItem>>(CartKey);
     if (saved is not null)
       cartItems = saved;
+  }
+
+  private static string ExtractCartSummary(string rawDescription)
+  {
+    if (string.IsNullOrWhiteSpace(rawDescription))
+    {
+      return string.Empty;
+    }
+
+    var summaryMatch = Regex.Match(rawDescription, @"<p>(.*?)</p>", RegexOptions.Singleline);
+    var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
+    summary = StripHtml(summary);
+
+    if (!string.IsNullOrWhiteSpace(summary))
+    {
+      return summary;
+    }
+
+    var fallback = StripHtml(rawDescription);
+    const int max = 140;
+    return fallback.Length <= max ? fallback : fallback[..max].TrimEnd() + "…";
+  }
+
+  private static string StripHtml(string input)
+  {
+    if (string.IsNullOrWhiteSpace(input))
+    {
+      return string.Empty;
+    }
+
+    var noTags = Regex.Replace(input, "<.*?>", string.Empty);
+    return System.Net.WebUtility.HtmlDecode(noTags).Trim();
   }
 
   private async Task SaveCart()
@@ -644,35 +728,30 @@ else
 
     try
     {
-      createdOrderIds.Clear();
-
-      foreach (var item in cartItems)
+      var checkoutRequest = new CreateCheckoutRequest
       {
-        var response = await Http.PostAsJsonAsync("api/commerce/orders", new CreateOrderRequest
-        {
-          ProductId = item.ProductId,
-          Quantity = item.Quantity
-        });
+        Provider = selectedProvider,
+        Items = cartItems.Select(i => new CreateCheckoutRequest.CheckoutItem { ProductId = i.ProductId, Quantity = i.Quantity }).ToList()
+      };
 
-        if (!response.IsSuccessStatusCode)
-        {
-          statusClass = "error";
-          statusMessage = $"Unable to process {item.Name}. Please try again.";
-          return;
-        }
-
-        var created = await response.Content.ReadFromJsonAsync<OrderResultDto>();
-        if (created is not null)
-        {
-          createdOrderIds.Add(created.OrderId);
-        }
+      var response = await Http.PostAsJsonAsync("api/payments/checkout", checkoutRequest);
+      if (!response.IsSuccessStatusCode)
+      {
+        statusClass = "error";
+        statusMessage = "Unable to start payment checkout. Please try again.";
+        return;
       }
 
-      cartItems.Clear();
-      await LocalStorage.RemoveItemAsync(CartKey);
-      statusClass = string.Empty;
-      statusMessage = null;
-      orderSuccess = true;
+      var payload = await response.Content.ReadFromJsonAsync<CreateCheckoutResponse>();
+      if (payload is null || string.IsNullOrWhiteSpace(payload.CheckoutUrl))
+      {
+        statusClass = "error";
+        statusMessage = "Checkout link is unavailable. Please try again.";
+        return;
+      }
+
+      // Keep cart until Stripe confirms payment (webhook). On success user can clear manually or we can clear after redirect.
+      Navigation.NavigateTo(payload.CheckoutUrl, forceLoad: true);
     }
     finally
     {
@@ -694,4 +773,3 @@ else
 
   private void GoBack() => Navigation.NavigateTo("/dashboard#products");
 }
-

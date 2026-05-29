@@ -13,12 +13,14 @@ namespace Kohinoorea.Server.Controllers;
 public sealed class CommerceController : ControllerBase
 {
     private readonly ICommerceRepository _commerceRepository;
+    private readonly IAuthRepository _authRepository;
     private readonly IEmailDeliveryService _emailDeliveryService;
     private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public CommerceController(ICommerceRepository commerceRepository, IEmailDeliveryService emailDeliveryService, IWebHostEnvironment webHostEnvironment)
+    public CommerceController(ICommerceRepository commerceRepository, IAuthRepository authRepository, IEmailDeliveryService emailDeliveryService, IWebHostEnvironment webHostEnvironment)
     {
         _commerceRepository = commerceRepository;
+        _authRepository = authRepository;
         _emailDeliveryService = emailDeliveryService;
         _webHostEnvironment = webHostEnvironment;
     }
@@ -50,7 +52,66 @@ public sealed class CommerceController : ControllerBase
 
         var productId = await _commerceRepository.CreateProductAsync(request, cancellationToken);
         var created = await _commerceRepository.GetProductByIdAsync(productId, cancellationToken);
+
+        if (created is not null && created.IsActive)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var recipients = await _authRepository.GetActiveUserEmailsAsync(cancellationToken);
+                    if (recipients.Count == 0)
+                    {
+                        return;
+                    }
+
+                    var subject = $"New product: {created.Name}";
+                    var body = ProductNotificationHtmlRenderer.Render(created);
+
+                    foreach (var email in recipients)
+                    {
+                        await _emailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
+                    }
+                }
+                catch
+                {
+                }
+            }, CancellationToken.None);
+        }
+
         return created is null ? NotFound() : Ok(created);
+    }
+
+    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpPost("products/{productId:long}/notify")]
+    public async Task<ActionResult> NotifyProduct([FromRoute] long productId, CancellationToken cancellationToken)
+    {
+        var product = await _commerceRepository.GetProductByIdAsync(productId, cancellationToken);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var recipients = await _authRepository.GetActiveUserEmailsAsync(cancellationToken);
+        if (recipients.Count == 0)
+        {
+            return Ok(new { success = true, message = "No active users to notify." });
+        }
+
+        var subject = $"New product: {product.Name}";
+        var body = ProductNotificationHtmlRenderer.Render(product);
+
+        var sent = 0;
+        foreach (var email in recipients)
+        {
+            var (success, _) = await _emailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
+            if (success)
+            {
+                sent++;
+            }
+        }
+
+        return Ok(new { success = true, message = $"Notification sent to {sent} user(s)." });
     }
 
     [Authorize(Roles = AuthRoles.Admin)]
@@ -168,7 +229,7 @@ public sealed class CommerceController : ControllerBase
             return NotFound("Product not found.");
         }
 
-        var orderId = await _commerceRepository.CreateOrderAsync(userId.Value, product, request.Quantity, cancellationToken);
+        var orderId = await _commerceRepository.CreateOrderAsync(userId.Value, product, request.Quantity, paymentMethod: "Card", cancellationToken: cancellationToken);
 
         return Ok(new OrderResultDto
         {
@@ -523,7 +584,26 @@ public sealed class CommerceController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var updated = await _commerceRepository.UpdateOrderStatusAsync(orderId, request.Status.Trim(), cancellationToken);
+        var newStatus = request.Status.Trim();
+        var existing = await _commerceRepository.GetOrderTraceByIdAsync(orderId, cancellationToken);
+        if (existing is null)
+        {
+            return NotFound();
+        }
+
+        var updated = await _commerceRepository.UpdateOrderStatusAsync(orderId, newStatus, cancellationToken);
+        if (updated &&
+            string.Equals(newStatus, "Completed", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(existing.Status, "Completed", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(existing.UserEmail))
+        {
+            var finalized = existing;
+            finalized.Status = newStatus;
+            var html = InvoiceHtmlRenderer.RenderOrderInvoiceHtml(finalized, currencyCountryCode: "US");
+            var subject = $"Your Kohinoorea Invoice (ORD-{finalized.OrderId})";
+            await _emailDeliveryService.SendHtmlEmailAsync(finalized.UserEmail, subject, html, cancellationToken);
+        }
+
         return updated ? NoContent() : NotFound();
     }
 

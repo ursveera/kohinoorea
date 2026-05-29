@@ -5,6 +5,32 @@
 
 <PageTitle>Buy</PageTitle>
 
+<style>
+  .buy-pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  @@media (max-width: 520px){ .buy-pay-grid { grid-template-columns: 1fr; } }
+  .buy-pay-btn { position: relative; display: block; cursor: pointer; user-select: none; }
+  .buy-pay-btn input { position: absolute; opacity: 0; pointer-events: none; }
+  .buy-pay-btn span {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    height: 44px; border-radius: 14px;
+    background: rgba(0,0,0,.18);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c8d4e8;
+    font-weight: 900;
+    transition: transform .12s ease, background .2s, border-color .2s, box-shadow .2s, color .2s;
+  }
+  body[data-theme="light"] .buy-pay-btn span { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.12); color:#374151; }
+  .buy-pay-btn span small { font-weight: 800; opacity: .75; }
+  .buy-pay-btn:hover span { transform: translateY(-1px); border-color: rgba(251,191,36,.35); }
+  .buy-pay-btn input:checked + span {
+    background: linear-gradient(180deg, rgba(251,191,36,.16), rgba(168,85,247,.10));
+    border-color: rgba(251,191,36,.45);
+    box-shadow: 0 10px 26px rgba(0,0,0,.22), 0 0 0 4px rgba(251,191,36,.08);
+    color: #f0f4ff;
+  }
+  body[data-theme="light"] .buy-pay-btn input:checked + span { color:#111827; }
+</style>
+
 <main>
     <section class="section">
       <div class="container">
@@ -35,27 +61,42 @@
                 <input type="radio" name="plan" value="monthly" checked="@(selectedPlan == "monthly")" @onclick="SelectMonthly">
                 <span class="plan-option-text">
                   <strong>Monthly Plan</strong>
-                  <span>@currency.FormatFromUsd(99m) - Lower-commitment access with full setup support.</span>
+                  <span>@CurrencyContext.FormatPriceForCountry(99m, currency.CountryCode) - Lower-commitment access with full setup support.</span>
                 </span>
               </label>
               <label class="plan-option plan-option-featured">
                 <input type="radio" name="plan" value="annual" checked="@(selectedPlan == "annual")" @onclick="SelectAnnual">
                 <span class="plan-option-text">
                   <strong>Annual Plan</strong>
-                  <span>@currency.FormatFromUsd(299m) - Saving @currency.FormatFromUsd(150m), 33.33% off, plus 15% extra off with LAUNCH26.</span>
+                  <span>@CurrencyContext.FormatPriceForCountry(299m, currency.CountryCode) - Saving @CurrencyContext.FormatPriceForCountry(150m, currency.CountryCode), 33.33% off, plus 15% extra off with LAUNCH26.</span>
                 </span>
               </label>
               <label class="plan-option">
                 <input type="radio" name="plan" value="lifetime" checked="@(selectedPlan == "lifetime")" @onclick="SelectLifetime">
                 <span class="plan-option-text">
                   <strong>Lifetime Plan (4 Years)</strong>
-                  <span>@currency.FormatFromUsd(799m) - Saving @currency.FormatFromUsd(364m), 31.25% off, with LAUNCH26 launch-offer support.</span>
+                  <span>@CurrencyContext.FormatPriceForCountry(799m, currency.CountryCode) - Saving @CurrencyContext.FormatPriceForCountry(364m, currency.CountryCode), 31.25% off, with LAUNCH26 launch-offer support.</span>
                 </span>
               </label>
             </fieldset>
             <textarea name="notes" @bind="buyerNotes" placeholder="Add anything the team should know before activation"></textarea>
+            <div style="margin-top:10px;">
+              <div style="color:#9ca3af;font-size:13px;font-weight:800;margin-bottom:8px;">Payment method</div>
+              <div class="buy-pay-grid">
+                <label class="buy-pay-btn">
+                  <input type="radio" name="buyPayMethod" value="Stripe" checked="@(selectedProvider == "Stripe")" @onchange="OnProviderChanged" />
+                  <span>Stripe <small>(Card)</small></span>
+                </label>
+                <label class="buy-pay-btn">
+                  <input type="radio" name="buyPayMethod" value="PayPal" checked="@(selectedProvider == "PayPal")" @onchange="OnProviderChanged" />
+                  <span>PayPal <small>(Wallet)</small></span>
+                </label>
+              </div>
+            </div>
             <div class="buy-actions">
-              <a class="button button-primary buy-primary-action" href="#" target="_blank" rel="noopener noreferrer" data-buy-stripe-link>Purchase Now with Stripe</a>
+              <button class="button button-primary buy-primary-action" type="button" @onclick="StartCheckoutAsync" disabled="@buySubmitting">
+                @(buySubmitting ? "Processing..." : "Proceed to Payment")
+              </button>
               <div class="buy-secondary-actions">
                 <button class="button button-secondary" type="button" @onclick="HandleBuySubmitAsync" disabled="@buySubmitting">@(buySubmitting ? "Placing Order..." : "Submit Purchase Request")</button>
                 <a class="button button-secondary" href="/cart?plan=annual" data-buy-cart-link>Review Cart</a>
@@ -116,6 +157,7 @@
 
 @code {
   private string selectedPlan = "annual";
+  private string selectedProvider = "Stripe";
   private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
   protected override async Task OnInitializedAsync()
@@ -170,26 +212,86 @@
         return;
       }
 
-      var response = await Http.PostAsJsonAsync("api/commerce/orders", new CreateOrderRequest
-      {
-        ProductId = match.Id,
-        Quantity = 1
-      });
-
-      if (!response.IsSuccessStatusCode)
-      {
-        buyStatusMessage = "Order could not be recorded. Please try again.";
-        return;
-      }
-
-      var order = await response.Content.ReadFromJsonAsync<OrderResultDto>();
-      buyOrderSuccess = true;
-      buyStatusMessage = $"Order recorded successfully! Order ID: ORD-{order?.OrderId}. Check your dashboard for status.";
+      await StartCheckoutAsync();
     }
     finally
     {
       buySubmitting = false;
     }
+  }
+
+  private async Task StartCheckoutAsync()
+  {
+    buyStatusMessage = null;
+    buySubmitting = true;
+
+    try
+    {
+      var token = await LocalStorage.GetItemAsync<string>("authToken");
+      if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+      {
+        Navigation.NavigateTo("/login", true);
+        return;
+      }
+
+      Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+      var allProducts = await Http.GetAsync("api/commerce/products?all=true");
+      if (!allProducts.IsSuccessStatusCode)
+      {
+        buyStatusMessage = "Unable to reach the product catalogue. Please try again.";
+        return;
+      }
+
+      var products = await allProducts.Content.ReadFromJsonAsync<List<ProductDto>>();
+      var match = products?.FirstOrDefault(p => p.Name.Contains(selectedPlan, StringComparison.OrdinalIgnoreCase));
+      if (match is null)
+      {
+        buyStatusMessage = "Plan not found in catalogue.";
+        return;
+      }
+
+      var checkoutRequest = new CreateCheckoutRequest
+      {
+        Provider = selectedProvider,
+        Items = new List<CreateCheckoutRequest.CheckoutItem>
+        {
+          new CreateCheckoutRequest.CheckoutItem { ProductId = match.Id, Quantity = 1 }
+        }
+      };
+
+      var response = await Http.PostAsJsonAsync("api/payments/checkout", checkoutRequest);
+      if (!response.IsSuccessStatusCode)
+      {
+        buyStatusMessage = "Unable to start payment checkout. Please try again.";
+        return;
+      }
+
+      var payload = await response.Content.ReadFromJsonAsync<CreateCheckoutResponse>();
+      if (payload is null || string.IsNullOrWhiteSpace(payload.CheckoutUrl))
+      {
+        buyStatusMessage = "Checkout link is unavailable. Please try again.";
+        return;
+      }
+
+      Navigation.NavigateTo(payload.CheckoutUrl, forceLoad: true);
+    }
+    finally
+    {
+      buySubmitting = false;
+    }
+  }
+
+  private void OnProviderChanged(ChangeEventArgs e)
+  {
+    var value = e?.Value?.ToString();
+    if (string.Equals(value, "PayPal", StringComparison.OrdinalIgnoreCase))
+    {
+      selectedProvider = "PayPal";
+      return;
+    }
+
+    selectedProvider = "Stripe";
   }
 
   private static bool IsTokenExpired(string token)

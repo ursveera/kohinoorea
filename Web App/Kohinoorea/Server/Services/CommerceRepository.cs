@@ -15,6 +15,10 @@ public sealed class CommerceRepository : ICommerceRepository
 
     public async Task<IReadOnlyList<ProductDto>> GetProductsAsync(bool onlyActive, string? countryCode = null, CancellationToken cancellationToken = default)
     {
+        var normalizedCountry = string.IsNullOrWhiteSpace(countryCode)
+            ? null
+            : countryCode.Trim().ToUpperInvariant();
+
         var query = _queryFactory.Query(AuthSqlKataSchema.ProductsTable)
             .Select(
                 AuthSqlKataSchema.ProductColumns.Id,
@@ -33,15 +37,29 @@ public sealed class CommerceRepository : ICommerceRepository
             query = query.Where(AuthSqlKataSchema.ProductColumns.IsActive, true);
         }
 
-        if (!string.IsNullOrWhiteSpace(countryCode))
+        if (!string.IsNullOrWhiteSpace(normalizedCountry))
         {
             query = query.Where(q => q
-                .Where(AuthSqlKataSchema.ProductColumns.CountryCode, countryCode.ToUpperInvariant())
+                .Where(AuthSqlKataSchema.ProductColumns.CountryCode, normalizedCountry)
                 .OrWhereNull(AuthSqlKataSchema.ProductColumns.CountryCode));
         }
 
-        var products = await query.GetAsync<ProductDto>(cancellationToken: cancellationToken);
-        return products.ToList();
+        var products = (await query.GetAsync<ProductDto>(cancellationToken: cancellationToken)).ToList();
+
+        if (string.IsNullOrWhiteSpace(normalizedCountry))
+        {
+            return products;
+        }
+
+        // Prefer country-specific rows over global (NULL country_code) defaults.
+        // This avoids returning duplicates when both exist for the same logical product.
+        return products
+            .OrderByDescending(p => string.Equals(p.CountryCode, normalizedCountry, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(p => p.CreatedAtUtc)
+            .GroupBy(p => $"{(p.IsMaster ? "M" : "P")}:{p.Name}", StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .ToList();
     }
 
     public async Task<ProductDto?> GetProductByIdAsync(long productId, CancellationToken cancellationToken = default)
@@ -126,7 +144,7 @@ public sealed class CommerceRepository : ICommerceRepository
         return affected > 0;
     }
 
-    public async Task<long> CreateOrderAsync(long userId, ProductDto product, int quantity, CancellationToken cancellationToken = default)
+    public async Task<long> CreateOrderAsync(long userId, ProductDto product, int quantity, string paymentMethod = "Card", CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var totalAmount = product.Price * quantity;
@@ -140,7 +158,7 @@ public sealed class CommerceRepository : ICommerceRepository
                 [AuthSqlKataSchema.OrderColumns.Quantity] = quantity,
                 [AuthSqlKataSchema.OrderColumns.UnitPrice] = product.Price,
                 [AuthSqlKataSchema.OrderColumns.TotalAmount] = totalAmount,
-                [AuthSqlKataSchema.OrderColumns.PaymentMethod] = "Card",
+                [AuthSqlKataSchema.OrderColumns.PaymentMethod] = string.IsNullOrWhiteSpace(paymentMethod) ? "Card" : paymentMethod.Trim(),
                 [AuthSqlKataSchema.OrderColumns.Status] = "Pending",
                 [AuthSqlKataSchema.OrderColumns.OrderedAtUtc] = now
             }, cancellationToken: cancellationToken);
@@ -469,6 +487,27 @@ public sealed class CommerceRepository : ICommerceRepository
             .GetAsync<OrderTraceDto>(cancellationToken: cancellationToken);
 
         return rows.ToList();
+    }
+
+    public async Task<OrderTraceDto?> GetOrderTraceByIdAsync(long orderId, CancellationToken cancellationToken = default)
+    {
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.OrdersTable + " as o")
+            .Join(AuthSqlKataSchema.ProductsTable + " as p", "o." + AuthSqlKataSchema.OrderColumns.ProductId, "p." + AuthSqlKataSchema.ProductColumns.Id)
+            .Join(AuthSqlKataSchema.UsersTable + " as u", "o." + AuthSqlKataSchema.OrderColumns.UserId, "u." + AuthSqlKataSchema.UserColumns.Id)
+            .SelectRaw("o.id as OrderId")
+            .SelectRaw("o.product_id as ProductId")
+            .SelectRaw("p.name as ProductName")
+            .SelectRaw("o.unit_price as UnitPrice")
+            .SelectRaw("o.quantity as Quantity")
+            .SelectRaw("o.total_amount as TotalAmount")
+            .SelectRaw("o.user_id as UserId")
+            .SelectRaw("u.email as UserEmail")
+            .SelectRaw("u.full_name as UserFullName")
+            .SelectRaw("o.ordered_at_utc as OrderedAtUtc")
+            .SelectRaw("o.status as Status")
+            .Where("o." + AuthSqlKataSchema.OrderColumns.Id, orderId)
+            .FirstOrDefaultAsync<OrderTraceDto>(cancellationToken: cancellationToken);
     }
 
     public async Task<bool> UpdateOrderStatusAsync(long orderId, string status, CancellationToken cancellationToken = default)

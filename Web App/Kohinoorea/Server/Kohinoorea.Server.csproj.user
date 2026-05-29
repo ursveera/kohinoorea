@@ -2,6 +2,6 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ActiveDebugProfile>https</ActiveDebugProfile>
-    <NameOfLastUsedPublishProfile>F:\Jameer\Web App\Kohinoorea\Server\Properties\PublishProfiles\DEvAPI.pubxml</NameOfLastUsedPublishProfile>
+    <NameOfLastUsedPublishProfile>F:\Jameer\Web App\Kohinoorea\Server\Properties\PublishProfiles\LIVEAPI.pubxml</NameOfLastUsedPublishProfile>
   </PropertyGroup>
 </Project>

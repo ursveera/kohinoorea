@@ -1666,6 +1666,12 @@
                       }
                     </div>
                     <div class="product-actions" @onclick:stopPropagation="true">
+                      <button class="product-action-btn"
+                              type="button"
+                              disabled="@IsProductNotified(product)"
+                              @onclick="() => NotifyUsersAboutProductAsync(product)">
+                        @(IsProductNotified(product) ? "Notified" : "Notify Users")
+                      </button>
                       <button class="product-action-btn" type="button" @onclick="() => ToggleProductActiveAsync(product)">@(product.IsActive ? "Soft Delete" : "Restore")</button>
                       <button class="product-action-btn force" type="button" @onclick="() => ForceDeleteProductAsync(product)">Force Delete</button>
                     </div>
@@ -2179,7 +2185,14 @@
               <EditForm Model="adminReplyRequest" OnValidSubmit="SendAdminReplyAsync">
                 <DataAnnotationsValidator />
                 <label>Reply to Customer</label>
-                <InputTextArea @bind-Value="adminReplyRequest.Message" placeholder="Reply to this query..." />
+                <InputTextArea Value="@adminReplyRequest.Message"
+                               ValueChanged="OnAdminReplyMessageChangedAsync"
+                               ValueExpression="@(() => adminReplyRequest.Message)"
+                               placeholder="Reply to this query..." />
+                @if (!string.IsNullOrWhiteSpace(realtimeTypingLine))
+                {
+                  <p class="summary-caption" style="margin-top:8px;">@realtimeTypingLine</p>
+                }
                 <button class="submit-btn" type="submit" style="margin-top:12px;">Send Reply</button>
               </EditForm>
             }
@@ -2239,6 +2252,7 @@ else
     private readonly Dictionary<long, string> pendingOrderStatuses = new();
     private readonly HashSet<long> savingOrderIds = new();
     private readonly HashSet<long> savingCustomerIds = new();
+    private readonly Dictionary<long, DateTime> notifiedProductUntilUtc = new();
     private readonly List<string> descriptionSummaryInputs = new();
     private readonly List<string> descriptionFeatureInputs = new();
     private CreateProductRequest createProduct = new() { IsActive = true };
@@ -2272,6 +2286,11 @@ else
     private bool isSendingContactReply;
     private bool isUpdatingSupportTicketStatus;
     private long? expandedSupportQueryId;
+    private IJSObjectReference? supportRealtimeModule;
+    private IJSObjectReference? supportRealtimeInstance;
+    private DotNetObjectReference<AdminDashboard>? supportRealtimeDotNetRef;
+    private string realtimeTypingLine = string.Empty;
+    private DateTime lastRealtimeTypingPingUtc = DateTime.MinValue;
     private long? editingProductId;
     private long? editingFaqId;
     private long? selectedFollowUpLeadUserId;
@@ -3026,6 +3045,67 @@ else
         adminReplyRequest = new CreateSupportQueryMessageRequest();
         activeSection = AdminSection.Support;
         await LoadSupportThreadAsync(queryId);
+        var selected = SelectedSupportThreadQuery;
+        if (selected is not null)
+        {
+            await StartSupportRealtimeAsync(selected.UserId);
+        }
+    }
+
+    private async Task NotifyUsersAboutProductAsync(ProductDto product)
+    {
+        if (notifiedProductUntilUtc.TryGetValue(product.Id, out var untilUtc) && untilUtc > DateTime.UtcNow)
+        {
+            return;
+        }
+
+        notifiedProductUntilUtc[product.Id] = DateTime.UtcNow.AddMinutes(1);
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PostAsync($"api/commerce/products/{product.Id}/notify", content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                statusMessage = "Unable to notify users about this product.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                notifiedProductUntilUtc.Remove(product.Id);
+                return;
+            }
+
+            statusMessage = $"Users notified about {product.Name}.";
+            _ = ShowToastAsync(statusMessage);
+        }
+        catch
+        {
+            statusMessage = "Unable to notify users about this product.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            notifiedProductUntilUtc.Remove(product.Id);
+        }
+        finally
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1));
+                }
+                catch
+                {
+                }
+
+                await InvokeAsync(() =>
+                {
+                    notifiedProductUntilUtc.Remove(product.Id);
+                    StateHasChanged();
+                });
+            });
+        }
+    }
+
+    private bool IsProductNotified(ProductDto product)
+    {
+        return notifiedProductUntilUtc.TryGetValue(product.Id, out var untilUtc) && untilUtc > DateTime.UtcNow;
     }
 
     private async Task LoadSupportThreadAsync(long queryId)
@@ -3052,6 +3132,7 @@ else
         }
 
         var queryId = expandedSupportQueryId.Value;
+        var messageText = adminReplyRequest.Message?.Trim() ?? string.Empty;
         var response = await Http.PostAsJsonAsync($"api/commerce/support/{queryId}/messages", adminReplyRequest);
         if (!response.IsSuccessStatusCode)
         {
@@ -3064,6 +3145,7 @@ else
         statusMessage = "Admin reply sent.";
         _ = ShowToastAsync("Reply sent.");
         await LoadSupportThreadAsync(queryId);
+        await PublishSupportRealtimeAsync(messageText);
     }
 
     private Task ToggleSelectedSupportTicketStatusAsync()
@@ -3119,6 +3201,141 @@ else
         expandedSupportQueryId = null;
         expandedSupportMessages.Clear();
         adminReplyRequest = new CreateSupportQueryMessageRequest();
+        realtimeTypingLine = string.Empty;
+        _ = StopSupportRealtimeAsync();
+    }
+
+    private async Task EnsureSupportRealtimeModuleAsync()
+    {
+        if (supportRealtimeModule is not null)
+        {
+            return;
+        }
+
+        supportRealtimeDotNetRef ??= DotNetObjectReference.Create(this);
+        supportRealtimeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/firebase-support-chat.js");
+    }
+
+    private async Task StartSupportRealtimeAsync(long ownerUserId)
+    {
+        await EnsureSupportRealtimeModuleAsync();
+        await StopSupportRealtimeAsync();
+        realtimeTypingLine = string.Empty;
+
+        var options = new
+        {
+            clientId = (string?)null,
+            role = "admin",
+            displayName = "Admin"
+        };
+
+        supportRealtimeInstance = await supportRealtimeModule!.InvokeAsync<IJSObjectReference>(
+            "createSupportChat",
+            supportRealtimeDotNetRef!,
+            $"ticket-{ownerUserId}",
+            options);
+    }
+
+    private async Task StopSupportRealtimeAsync()
+    {
+        if (supportRealtimeInstance is not null)
+        {
+            try { await supportRealtimeInstance.InvokeVoidAsync("dispose"); } catch { }
+            try { await supportRealtimeInstance.DisposeAsync(); } catch { }
+            supportRealtimeInstance = null;
+        }
+    }
+
+    private async Task PublishSupportRealtimeAsync(string messageText)
+    {
+        if (supportRealtimeInstance is null || string.IsNullOrWhiteSpace(messageText))
+        {
+            return;
+        }
+
+        try
+        {
+            await supportRealtimeInstance.InvokeVoidAsync("sendMessage", messageText);
+            await supportRealtimeInstance.InvokeVoidAsync("setTyping", false);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task OnAdminReplyMessageChangedAsync(string value)
+    {
+        adminReplyRequest.Message = value;
+
+        if (!expandedSupportQueryId.HasValue || supportRealtimeInstance is null)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (now - lastRealtimeTypingPingUtc < TimeSpan.FromSeconds(2))
+        {
+            return;
+        }
+
+        lastRealtimeTypingPingUtc = now;
+        try
+        {
+            await supportRealtimeInstance.InvokeVoidAsync("setTyping", !string.IsNullOrWhiteSpace(adminReplyRequest.Message));
+        }
+        catch
+        {
+        }
+    }
+
+    public sealed class SupportRealtimeMessage
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+        public string SenderRole { get; set; } = "user";
+        public string SenderName { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public long? CreatedAt { get; set; }
+    }
+
+    public sealed class SupportTypingUser
+    {
+        public string ClientId { get; set; } = string.Empty;
+        public string Role { get; set; } = "user";
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
+    [JSInvokable]
+    public async Task OnMessage(SupportRealtimeMessage message)
+    {
+        if (!expandedSupportQueryId.HasValue)
+        {
+            return;
+        }
+
+        await LoadSupportThreadAsync(expandedSupportQueryId.Value);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnTyping(List<SupportTypingUser> typing)
+    {
+        if (typing is null || typing.Count == 0)
+        {
+            realtimeTypingLine = string.Empty;
+        }
+        else
+        {
+            var names = typing
+                .Select(t => string.IsNullOrWhiteSpace(t.DisplayName) ? t.Role : t.DisplayName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(1)
+                .ToList();
+
+            realtimeTypingLine = names.Count == 0 ? "User is typing…" : $"{names[0]} is typing…";
+        }
+
+        return InvokeAsync(StateHasChanged);
     }
 
     private void SelectFollowUpLead(AdminLeadNotificationDto lead)

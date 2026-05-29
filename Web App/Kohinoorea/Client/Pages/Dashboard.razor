@@ -820,6 +820,7 @@
   .thread-stack {
     flex: 1 1 auto;
     min-height: 320px;
+    max-height: 46vh;
     overflow-y: auto;
     padding: 18px;
     border-radius: 22px;
@@ -856,9 +857,9 @@
   }
 
   .chat-bubble {
-    max-width: min(82%, 520px);
+    max-width: min(84%, 520px);
     padding: 12px 14px;
-    border-radius: 18px;
+    border-radius: 16px;
     font-size: 13px;
     line-height: 1.6;
     white-space: pre-wrap;
@@ -866,11 +867,11 @@
   }
 
   .chat-bubble.user {
-    justify-self: end;
-    background: linear-gradient(135deg, rgba(251,191,36,0.22), rgba(249,115,22,0.2));
-    border: 1px solid rgba(251,191,36,0.28);
+    justify-self: start;
+    background: rgba(251,191,36,0.18);
+    border: 1px solid rgba(251,191,36,0.3);
     color: #d97706;
-    border-bottom-right-radius: 6px;
+    border-bottom-left-radius: 6px;
   }
 
   body[data-theme="dark"] .chat-bubble.user {
@@ -878,11 +879,11 @@
   }
 
   .chat-bubble.admin {
-    justify-self: start;
+    justify-self: end;
     background: rgba(96,165,250,0.12);
-    border: 1px solid rgba(96,165,250,0.2);
+    border: 1px solid rgba(96,165,250,0.22);
     color: #2563eb;
-    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
   }
 
   body[data-theme="dark"] .chat-bubble.admin {
@@ -892,7 +893,7 @@
 
   .chat-meta {
     display: block;
-    margin-top: 8px;
+    margin-top: 6px;
     font-size: 11px;
     opacity: 0.75;
   }
@@ -905,6 +906,20 @@
   .support-chat-composer textarea {
     margin-bottom: 0;
     min-height: 110px;
+    width: 100%;
+    border: 1px solid var(--d-input-border);
+    background: var(--d-input-bg);
+    color: var(--d-input-text);
+    padding: 13px 14px;
+    border-radius: 16px;
+    outline: none;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .support-chat-composer textarea:focus {
+    border-color: rgba(251,191,36,0.4);
   }
 
   .composer-actions {
@@ -1161,7 +1176,7 @@
                     <td><strong>ORD-@order.OrderId</strong></td>
                     <td>@order.ProductName</td>
                     <td>@order.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
-                    <td>@currency.FormatFromUsd(order.TotalAmount)</td>
+                    <td>@CurrencyContext.FormatPriceForCountry(order.TotalAmount, "US")</td>
                     <td>@(string.IsNullOrWhiteSpace(order.PaymentMethod) ? "Card" : order.PaymentMethod)</td>
                     <td><span class="status @GetStatusCss(order.Status)">@GetOrderStatusLabel(order.Status)</span></td>
                     <td>
@@ -1216,7 +1231,7 @@
                 }
                 <p>@descText</p>
                 <div class="price-row">
-                  <span class="price">@currency.FormatFromUsd(product.Price)</span>
+                  <span class="price">@CurrencyContext.FormatPriceForCountry(product.Price, product.CountryCode ?? "US")</span>
                   <div style="display:flex; gap:8px;">
                     <button class="buy-btn" type="button" @onclick="() => AddToCartAsync(product.Id, product.Name)">Add to Cart</button>
                     <button class="buy-btn" type="button" style="background:linear-gradient(135deg,#a855f7,#7c3aed);" @onclick="() => NavigateToBuyProduct(product.Id)">Buy Now</button>
@@ -1377,7 +1392,14 @@
                 {
                   <p class="summary-caption support-closed-note">This ticket is currently closed. Sending a message will reopen it and move it back to Open Tickets.</p>
                 }
-                <InputTextArea @bind-Value="replyRequest.Message" placeholder="Type your message..." />
+                <InputTextArea Value="@replyRequest.Message"
+                               ValueChanged="OnReplyMessageChangedAsync"
+                               ValueExpression="@(() => replyRequest.Message)"
+                               placeholder="Type your message..." />
+                @if (!string.IsNullOrWhiteSpace(realtimeTypingLine))
+                {
+                  <p class="empty-note" style="margin-top:6px;">@realtimeTypingLine</p>
+                }
                 <div class="composer-actions">
                   <p class="empty-note">Admin replies stay inside this thread so your full support history is always visible.</p>
                   <button class="submit-btn" type="submit">@(IsClosedSupportTicket(selectedQuery.Status) ? "Send & Reopen" : "Send Message")</button>
@@ -1433,6 +1455,14 @@
     private SupportTicketFilter activeSupportTicketFilter = SupportTicketFilter.Open;
     private string? pendingScrollAnchor;
 
+    private IJSObjectReference? supportRealtimeModule;
+    private IJSObjectReference? supportRealtimeInstance;
+    private DotNetObjectReference<Dashboard>? supportRealtimeDotNetRef;
+    private string realtimeTypingLine = string.Empty;
+    private DateTime lastRealtimeTypingPingUtc = DateTime.MinValue;
+    private long? currentUserId;
+    private bool currentUserIsAdmin;
+
     private string ProfileEmail => profileEmail;
     private string CurrentPlanName => currentPlanName;
     private string MembershipMessage => membershipMessage;
@@ -1463,6 +1493,9 @@
       Navigation.LocationChanged += HandleLocationChanged;
 
         currency = await CurrencyContext.ResolveAsync(Http, LocalStorage);
+
+        var authToken = await LocalStorage.GetItemAsync<string>("authToken");
+        (currentUserId, currentUserIsAdmin) = ResolveRealtimeIdentity(authToken);
 
         var meResponse = await Http.GetAsync("api/auth/me");
         if (!meResponse.IsSuccessStatusCode)
@@ -1571,6 +1604,11 @@
         expandedQueryId = queryId;
         replyRequest = new CreateSupportQueryMessageRequest();
         await LoadThreadMessagesAsync(queryId);
+        var ownerUserId = SelectedSupportQuery?.UserId ?? currentUserId;
+        if (ownerUserId.HasValue)
+        {
+            await StartSupportRealtimeAsync(ownerUserId.Value);
+        }
     }
 
     private void CloseQueryThread()
@@ -1578,6 +1616,8 @@
         expandedQueryId = null;
         activeQueryMessages.Clear();
         replyRequest = new CreateSupportQueryMessageRequest();
+        realtimeTypingLine = string.Empty;
+        _ = StopSupportRealtimeAsync();
     }
 
     private async Task LoadThreadMessagesAsync(long queryId)
@@ -1603,6 +1643,7 @@
         }
 
         var queryId = expandedQueryId.Value;
+        var messageText = replyRequest.Message?.Trim() ?? string.Empty;
         var wasClosed = IsClosedSupportTicket(SelectedSupportQuery?.Status);
         var response = await Http.PostAsJsonAsync($"api/commerce/support/my/{queryId}/messages", replyRequest);
         if (!response.IsSuccessStatusCode)
@@ -1624,6 +1665,187 @@
 
         replyRequest = new CreateSupportQueryMessageRequest();
         await LoadThreadMessagesAsync(queryId);
+        await PublishSupportRealtimeAsync(queryId, messageText);
+    }
+
+    private async Task OnReplyMessageChangedAsync(string value)
+    {
+        replyRequest.Message = value;
+
+        if (!expandedQueryId.HasValue || supportRealtimeInstance is null)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (now - lastRealtimeTypingPingUtc < TimeSpan.FromSeconds(2))
+        {
+            return;
+        }
+
+        lastRealtimeTypingPingUtc = now;
+        try
+        {
+            await supportRealtimeInstance.InvokeVoidAsync("setTyping", !string.IsNullOrWhiteSpace(replyRequest.Message));
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task EnsureSupportRealtimeModuleAsync()
+    {
+        if (supportRealtimeModule is not null)
+        {
+            return;
+        }
+
+        supportRealtimeDotNetRef ??= DotNetObjectReference.Create(this);
+        supportRealtimeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/firebase-support-chat.js");
+    }
+
+    private async Task StartSupportRealtimeAsync(long ownerUserId)
+    {
+        await EnsureSupportRealtimeModuleAsync();
+
+        await StopSupportRealtimeAsync();
+        realtimeTypingLine = string.Empty;
+
+        var display = string.IsNullOrWhiteSpace(ProfileEmail) ? "User" : ProfileEmail.Trim();
+        var options = new
+        {
+            clientId = (string?)null,
+            role = currentUserIsAdmin ? "admin" : "user",
+            displayName = display
+        };
+
+        supportRealtimeInstance = await supportRealtimeModule!.InvokeAsync<IJSObjectReference>(
+            "createSupportChat",
+            supportRealtimeDotNetRef!,
+            $"ticket-{ownerUserId}",
+            options);
+    }
+
+    private static (long? UserId, bool IsAdmin) ResolveRealtimeIdentity(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return (null, false);
+        }
+
+        try
+        {
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            if (!handler.CanReadToken(token))
+            {
+                return (null, false);
+            }
+
+            var jwt = handler.ReadJwtToken(token);
+            var role = jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "role", StringComparison.OrdinalIgnoreCase))?.Value
+                       ?? jwt.Claims.FirstOrDefault(c => c.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase))?.Value;
+            var isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+            var userIdValue = jwt.Claims.FirstOrDefault(c => c.Type.EndsWith("/nameidentifier", StringComparison.OrdinalIgnoreCase))?.Value
+                              ?? jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, "sub", StringComparison.OrdinalIgnoreCase))?.Value;
+
+            return long.TryParse(userIdValue, out var id) ? (id, isAdmin) : (null, isAdmin);
+        }
+        catch
+        {
+            return (null, false);
+        }
+    }
+
+    private async Task StopSupportRealtimeAsync()
+    {
+        if (supportRealtimeInstance is not null)
+        {
+            try { await supportRealtimeInstance.InvokeVoidAsync("dispose"); } catch { }
+            try { await supportRealtimeInstance.DisposeAsync(); } catch { }
+            supportRealtimeInstance = null;
+        }
+    }
+
+    private async Task PublishSupportRealtimeAsync(long queryId, string text)
+    {
+        if (supportRealtimeInstance is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await supportRealtimeInstance.InvokeVoidAsync("sendMessage", text);
+            await supportRealtimeInstance.InvokeVoidAsync("setTyping", false);
+        }
+        catch
+        {
+            supportStatusMessage = "Realtime update blocked (check Firebase rules/auth).";
+        }
+    }
+
+    public sealed class SupportRealtimeMessage
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+        public string SenderRole { get; set; } = "user";
+        public string SenderName { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public long? CreatedAt { get; set; }
+    }
+
+    public sealed class SupportTypingUser
+    {
+        public string ClientId { get; set; } = string.Empty;
+        public string Role { get; set; } = "user";
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
+    [JSInvokable]
+    public async Task OnMessage(SupportRealtimeMessage message)
+    {
+        if (!expandedQueryId.HasValue)
+        {
+            return;
+        }
+
+        // Another party posted (after saving in DB); refresh the SQL-backed thread for canonical ordering/ids.
+        await LoadThreadMessagesAsync(expandedQueryId.Value);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnTyping(List<SupportTypingUser> typing)
+    {
+        if (typing is null || typing.Count == 0)
+        {
+            realtimeTypingLine = string.Empty;
+        }
+        else
+        {
+            var names = typing
+                .Select(t => string.IsNullOrWhiteSpace(t.DisplayName) ? t.Role : t.DisplayName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(1)
+                .ToList();
+
+            realtimeTypingLine = names.Count == 0 ? "Support is typing…" : $"{names[0]} is typing…";
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopSupportRealtimeAsync();
+        if (supportRealtimeModule is not null)
+        {
+            try { await supportRealtimeModule.DisposeAsync(); } catch { }
+            supportRealtimeModule = null;
+        }
+        supportRealtimeDotNetRef?.Dispose();
+        supportRealtimeDotNetRef = null;
     }
 
     private async Task LoadDashboardDataAsync()
@@ -1742,15 +1964,15 @@
             "    <table>",
             "      <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th class='amount'>Line Total</th></tr></thead>",
             "      <tbody>",
-            $"        <tr><td>{Encode(order.ProductName)}</td><td>{quantity}</td><td>{Encode(currency.FormatFromUsd(unitPrice))}</td><td class='amount'>{Encode(currency.FormatFromUsd(order.TotalAmount))}</td></tr>",
+            $"        <tr><td>{Encode(order.ProductName)}</td><td>{quantity}</td><td>{Encode(CurrencyContext.FormatPriceForCountry(unitPrice, "US"))}</td><td class='amount'>{Encode(CurrencyContext.FormatPriceForCountry(order.TotalAmount, "US"))}</td></tr>",
             "      </tbody>",
             "    </table>",
             "    <div class='summary-wrap'>",
             "      <div class='summary'>",
             $"        <div class='row'><span>Payment Method</span><span>{Encode(paymentMethod)}</span></div>",
-            $"        <div class='row'><span>Subtotal</span><span>{Encode(currency.FormatFromUsd(order.TotalAmount))}</span></div>",
-            $"        <div class='row'><span>Tax</span><span>{Encode(currency.FormatFromUsd(0))}</span></div>",
-            $"        <div class='row total'><span>Total</span><span>{Encode(currency.FormatFromUsd(order.TotalAmount))}</span></div>",
+            $"        <div class='row'><span>Subtotal</span><span>{Encode(CurrencyContext.FormatPriceForCountry(order.TotalAmount, "US"))}</span></div>",
+            $"        <div class='row'><span>Tax</span><span>{Encode(CurrencyContext.FormatPriceForCountry(0, "US"))}</span></div>",
+            $"        <div class='row total'><span>Total</span><span>{Encode(CurrencyContext.FormatPriceForCountry(order.TotalAmount, "US"))}</span></div>",
             "      </div>",
             "    </div>",
             "    <p class='note'>This invoice was generated from your Kohinoorea dashboard order history. Keep this file for your records or print it as needed.</p>",

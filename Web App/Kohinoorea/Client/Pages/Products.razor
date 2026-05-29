@@ -29,10 +29,10 @@
         var prodRaw = product.Description ?? string.Empty;
         var prodSummaryMatch = Regex.Match(prodRaw, @"<p>(.*?)</p>", RegexOptions.Singleline);
         var prodSummary = prodSummaryMatch.Success
-          ? currency.ReplacePricesInTextFromUsd(prodSummaryMatch.Groups[1].Value.Trim())
+          ? prodSummaryMatch.Groups[1].Value.Trim()
           : "Premium Kohinoor EA product for MT4 automated trading.";
         var prodFeatures = Regex.Matches(prodRaw, @"<span>(.*?)</span>", RegexOptions.Singleline)
-                               .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
+                               .Select(m => m.Groups[1].Value.Trim())
                                .Where(f => f.Length > 0)
                                .ToList();
         if (prodFeatures.Count == 0)
@@ -40,7 +40,7 @@
         <article class="product-card @(product.Name.Contains("Annual", StringComparison.OrdinalIgnoreCase) ? "featured-product" : string.Empty)">
           <div class="product-card-top">
             <span class="mini-label">Entry access</span>
-            <strong>@currency.FormatFromUsd(product.Price)</strong>
+            <strong>@CurrencyContext.FormatPriceForCountry(product.Price, product.CountryCode)</strong>
           </div>
           <h2>@product.Name</h2>
           <p>@prodSummary</p>

@@ -1,0 +1,67 @@
+@page "/paypal/return"
+@using System.Net.Http.Headers
+@using Kohinoorea.Shared.Models.Commerce
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<div class="container" style="padding:24px">
+  <h3 style="margin:0 0 6px">Processing PayPal payment…</h3>
+  <div style="color:#9ca3af">@status</div>
+</div>
+
+@code {
+  private string status = "Please wait.";
+
+  protected override async Task OnInitializedAsync()
+  {
+    var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+    var tokenFromQuery = GetQueryValue(uri.Query, "token");
+
+    if (string.IsNullOrWhiteSpace(tokenFromQuery))
+    {
+      status = "Missing PayPal token. Redirecting…";
+      Navigation.NavigateTo("/dashboard#orders", true);
+      return;
+    }
+
+    var token = await LocalStorage.GetItemAsync<string>("authToken");
+    if (string.IsNullOrWhiteSpace(token))
+    {
+      status = "Session expired. Please login again.";
+      Navigation.NavigateTo("/login", true);
+      return;
+    }
+
+    Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    var orderId = tokenFromQuery;
+    var response = await Http.PostAsJsonAsync("api/paypal/capture", new CapturePayPalOrderRequest { OrderId = orderId });
+    if (!response.IsSuccessStatusCode)
+    {
+      status = "Unable to confirm PayPal payment. Please contact support.";
+      return;
+    }
+
+    status = "Payment confirmed. Redirecting…";
+    Navigation.NavigateTo("/dashboard#orders", true);
+  }
+
+  private static string? GetQueryValue(string queryString, string key)
+  {
+    if (string.IsNullOrWhiteSpace(queryString) || string.IsNullOrWhiteSpace(key)) return null;
+    var query = queryString.TrimStart('?');
+    if (string.IsNullOrWhiteSpace(query)) return null;
+
+    foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+    {
+      var kv = part.Split('=', 2);
+      if (kv.Length != 2) continue;
+      var k = Uri.UnescapeDataString(kv[0]);
+      if (!string.Equals(k, key, StringComparison.OrdinalIgnoreCase)) continue;
+      return Uri.UnescapeDataString(kv[1]);
+    }
+
+    return null;
+  }
+}

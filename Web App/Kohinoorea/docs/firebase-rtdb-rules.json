@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "supportRooms": {
+      "$room": {
+        ".read": "auth != null && (auth.token.role === 'admin' || $room === ('ticket-' + auth.uid))",
+        ".write": "auth != null && (auth.token.role === 'admin' || $room === ('ticket-' + auth.uid))",
+        "messages": {
+          ".indexOn": ["createdAt"]
+        }
+      }
+    }
+  }
+}

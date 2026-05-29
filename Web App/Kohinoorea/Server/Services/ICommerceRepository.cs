@@ -18,7 +18,7 @@ public interface ICommerceRepository
 
     Task<bool> ForceDeleteProductAsync(long productId, CancellationToken cancellationToken = default);
 
-    Task<long> CreateOrderAsync(long userId, ProductDto product, int quantity, CancellationToken cancellationToken = default);
+    Task<long> CreateOrderAsync(long userId, ProductDto product, int quantity, string paymentMethod = "Card", CancellationToken cancellationToken = default);
 
     Task<long> AddCartItemAsync(long userId, ProductDto product, int quantity, CancellationToken cancellationToken = default);
 
@@ -57,6 +57,8 @@ public interface ICommerceRepository
     Task<bool> UpdateSupportQueryStatusAsync(long queryId, string status, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<OrderTraceDto>> GetOrderTraceAsync(CancellationToken cancellationToken = default);
+
+    Task<OrderTraceDto?> GetOrderTraceByIdAsync(long orderId, CancellationToken cancellationToken = default);
 
     Task<bool> UpdateOrderStatusAsync(long orderId, string status, CancellationToken cancellationToken = default);
 }

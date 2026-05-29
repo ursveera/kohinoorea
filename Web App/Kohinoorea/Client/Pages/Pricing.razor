@@ -29,9 +29,9 @@
         {
           var raw = plan.Description ?? string.Empty;
           var summaryMatch = Regex.Match(raw, @"<p>(.*?)</p>", RegexOptions.Singleline);
-          var summary = summaryMatch.Success ? currency.ReplacePricesInTextFromUsd(summaryMatch.Groups[1].Value.Trim()) : string.Empty;
+          var summary = summaryMatch.Success ? summaryMatch.Groups[1].Value.Trim() : string.Empty;
           var features = Regex.Matches(raw, @"<span>(.*?)</span>", RegexOptions.Singleline)
-                              .Select(m => currency.ReplacePricesInTextFromUsd(m.Groups[1].Value.Trim()))
+                              .Select(m => m.Groups[1].Value.Trim())
                               .Where(f => f.Length > 0)
                               .ToList();
           <article class="pricing-card @(plan.Id == featuredPlanId ? "" : null)">
@@ -46,7 +46,7 @@
               }
             </div>
             <h3>@plan.Name</h3>
-            <div class="price"><strong>@currency.FormatFromUsd(plan.Price)</strong></div>
+            <div class="price"><strong>@CurrencyContext.FormatPriceForCountry(plan.Price, plan.CountryCode)</strong></div>
             @if (!string.IsNullOrEmpty(summary))
             {
               <p class="pricing-plan-summary">@summary</p>

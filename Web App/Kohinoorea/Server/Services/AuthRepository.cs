@@ -42,6 +42,23 @@ public sealed class AuthRepository : IAuthRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<string>> GetActiveUserEmailsAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Select(AuthSqlKataSchema.UserColumns.Email)
+            .Where(AuthSqlKataSchema.UserColumns.Role, AuthRoles.User)
+            .Where(AuthSqlKataSchema.UserColumns.IsActive, true)
+            .WhereNotNull(AuthSqlKataSchema.UserColumns.Email)
+            .GetAsync<string>(cancellationToken: cancellationToken);
+
+        return rows
+            .Select(email => email?.Trim())
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()!;
+    }
+
     public async Task<IReadOnlyList<AdminLeadNotificationDto>> GetFollowUpCandidatesAsync(CancellationToken cancellationToken = default)
     {
         var rows = await BuildFollowUpCandidatesQuery()

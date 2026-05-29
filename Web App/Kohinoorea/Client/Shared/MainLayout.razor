@@ -24,9 +24,52 @@
             return;
         }
 
+        _ = EnsureFirebaseAuthAsync();
+
         _idleCts = new CancellationTokenSource();
         _idleTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         _ = MonitorIdleTimeoutAsync(_idleCts.Token);
+    }
+
+    private async Task EnsureFirebaseAuthAsync()
+    {
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return;
+            }
+
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            // Server already validated JWT on protected endpoints. If this call succeeds,
+            // sign in to Firebase so RTDB rules can use auth != null.
+            var response = await Http.GetAsync("api/firebase/token");
+            if (!response.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("eval", $"console.error('[firebaseAuth] /api/firebase/token failed', {response.StatusCode:d});");
+                return;
+            }
+
+            var customToken = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(customToken))
+            {
+                return;
+            }
+
+            var module = await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/firebase-auth.js");
+            var signedIn = await module.InvokeAsync<bool>("isSignedIn");
+            if (!signedIn)
+            {
+                await JS.InvokeVoidAsync("eval", "console.log('[firebaseAuth] received custom token');");
+                await module.InvokeAsync<object>("signIn", customToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("eval", $"console.error('[firebaseAuth] EnsureFirebaseAuthAsync failed', {System.Text.Json.JsonSerializer.Serialize(ex.Message)});");
+        }
     }
 
     private async Task MonitorIdleTimeoutAsync(CancellationToken cancellationToken)

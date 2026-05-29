@@ -44,6 +44,19 @@ public sealed class CurrencyContext
         return $"{symbol}{number}";
     }
 
+    public static string FormatPriceForCountry(decimal amount, string? countryCode, string format = "N0")
+    {
+        var normalizedCountry = string.IsNullOrWhiteSpace(countryCode)
+            ? "US"
+            : countryCode.Trim().ToUpperInvariant();
+
+        var currencyCode = GetCurrencyCodeFromCountry(normalizedCountry);
+        var culture = GetCulture(normalizedCountry, currencyCode);
+        var number = amount.ToString(format, culture);
+        var symbol = culture.NumberFormat.CurrencySymbol;
+        return $"{symbol}{number}";
+    }
+
     public string ReplacePricesInTextFromUsd(string input)
     {
         if (string.IsNullOrWhiteSpace(input))

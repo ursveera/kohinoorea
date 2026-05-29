@@ -541,7 +541,7 @@
 
     private CurrencyContext currency = CurrencyContext.FromCountryCode("US");
 
-    private string FormatUsd(decimal price) => currency.FormatFromUsd(price);
+    private string FormatUsd(decimal price) => CurrencyContext.FormatPriceForCountry(price, currency.CountryCode);
 
     private static string GetPlanPromo(ProductDto product)
     {
