@@ -4064,6 +4064,12 @@ else
 
     private static List<string> BuildSelectedAdminRoles(AdminRoleSelection selection)
     {
+        if (IsAllRolesSelected(selection))
+        {
+            // Keep DB role value small and treat plain Admin as full access.
+            return new List<string> { AuthRoles.Admin };
+        }
+
         var roles = new List<string> { AuthRoles.Admin };
         if (selection.Admins) roles.Add(AdminSectionRoles.Admins);
         if (selection.Products) roles.Add(AdminSectionRoles.Products);

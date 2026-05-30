@@ -455,3 +455,6 @@ BEGIN
         ON dbo.contact_messages (is_replied, created_at_utc DESC);
 END;
 GO
+
+ALTER TABLE dbo.users
+ALTER COLUMN role NVARCHAR(500) NOT NULL;

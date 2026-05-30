@@ -144,7 +144,7 @@ public sealed class AuthRepository : IAuthRepository
                 [AuthSqlKataSchema.UserColumns.FullName] = request.FullName.Trim(),
                 [AuthSqlKataSchema.UserColumns.Email] = normalizedEmail,
                 [AuthSqlKataSchema.UserColumns.Phone] = normalizedPhone,
-                [AuthSqlKataSchema.UserColumns.Mt4Broker] = null,
+                [AuthSqlKataSchema.UserColumns.Mt4Broker] = string.Empty,
                 [AuthSqlKataSchema.UserColumns.PasswordHash] = passwordHash,
                 [AuthSqlKataSchema.UserColumns.Role] = string.Join(";", roles),
                 [AuthSqlKataSchema.UserColumns.IsActive] = true,
@@ -175,7 +175,7 @@ public sealed class AuthRepository : IAuthRepository
     private static List<string> NormalizeAdminRoles(IEnumerable<string>? roles)
     {
         var normalized = (roles ?? Array.Empty<string>())
-            .Select(r => r.Trim())
+            .Select(r => (r ?? string.Empty).Trim())
             .Where(r => !string.IsNullOrWhiteSpace(r))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();

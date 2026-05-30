@@ -19,7 +19,16 @@ var builder = WebApplication.CreateBuilder(args);
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // QuestPDF (community license)
-QuestPDF.Settings.License = LicenseType.Community;
+try
+{
+    QuestPDF.Settings.License = LicenseType.Community;
+}
+catch
+{
+    // Hosting may run in an unsupported runtime (e.g., win-x86 / 32-bit),
+    // causing QuestPDF native dependencies to fail to load.
+    // The app can still run without PDF export support.
+}
 
 // Add services to the container.
 
@@ -30,16 +39,31 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ClientCors", policy =>
     {
         policy
-            .WithOrigins(
-            "http://localhost:5010",
-            "https://localhost:5010",
-            "https://localhost:7023",
-            "https://kohinoorea.com",
-            "https://kohinoorea.com", 
-            "http://dev-kohinoorea.kohinoorea.com",
-            "https://dev-kohinoorea.kohinoorea.com", 
-            "http://apikohinoorea.kohinoorea.com", 
-            "http://dev-api-kohinoorea.kohinoorea.com")
+            .SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin))
+                {
+                    return false;
+                }
+
+                if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                {
+                    return false;
+                }
+
+                // Allow known hosts across http/https and varying ports (needed for IIS/Azure/AppService + local dev).
+                var allowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "localhost",
+                    "kohinoorea.com",
+                    "www.kohinoorea.com",
+                    "dev-kohinoorea.kohinoorea.com",
+                    "apikohinoorea.kohinoorea.com",
+                    "dev-api-kohinoorea.kohinoorea.com"
+                };
+
+                return allowedHosts.Contains(uri.Host);
+            })
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -139,8 +163,6 @@ catch
     // Best-effort: app still runs without Firebase, but /api/firebase/token will fail.
 }
 
-app.UseMiddleware<GlobalExceptionMiddleware>();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -156,6 +178,10 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 app.UseCors("ClientCors");
+
+// CORS must run before global exception handling writes responses,
+// otherwise error responses can miss CORS headers and fail in browsers.
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
