@@ -12,6 +12,8 @@ public sealed class AuthResponse
 
     public string? Role { get; set; }
 
+    public List<string>? Roles { get; set; }
+
     public string? Token { get; set; }
 
     public DateTime? ExpiresAtUtc { get; set; }

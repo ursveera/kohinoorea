@@ -1,4 +1,7 @@
 @page "/registration"
+@using System.Net.Http.Headers
+@using Blazored.LocalStorage
+@using Microsoft.JSInterop
 
 <PageTitle>Registration</PageTitle>
 
@@ -220,6 +223,12 @@
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
 
+    [Inject]
+    private ILocalStorageService LocalStorage { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
     private bool CanSendEmailOtp => !isSubmitting && !isSendingOtp && !isVerifyingOtp && !string.IsNullOrWhiteSpace(signupRequest.Email);
 
     private bool CanVerifyEmailOtp => !isSubmitting && !isSendingOtp && !isVerifyingOtp && !isEmailVerified && showOtpEntry && emailOtpCode.Length == 6 && !string.IsNullOrWhiteSpace(signupRequest.Email);
@@ -268,6 +277,42 @@
 
             if (response.IsSuccessStatusCode && payload?.Success == true)
             {
+                try
+                {
+                    var loginResponse = await Http.PostAsJsonAsync("api/auth/login", new LoginRequest
+                    {
+                        Email = signupRequest.Email,
+                        Password = signupRequest.Password
+                    });
+
+                    AuthResponse? loginPayload = null;
+                    if (IsJsonResponse(loginResponse))
+                    {
+                        try
+                        {
+                            loginPayload = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    if (loginResponse.IsSuccessStatusCode &&
+                        loginPayload?.Success == true &&
+                        !string.IsNullOrWhiteSpace(loginPayload.Token))
+                    {
+                        await LocalStorage.SetItemAsync("authToken", loginPayload.Token);
+                        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginPayload.Token);
+                        await JS.InvokeVoidAsync("kohinoorAuthTouch");
+                        Navigation.NavigateTo("/dashboard", true);
+                        return;
+                    }
+                }
+                catch
+                {
+                }
+
+                // Fallback (if auto-login fails for any reason).
                 Navigation.NavigateTo($"/login?plan={Uri.EscapeDataString(signupRequest.AccessPlan)}", true);
                 return;
             }

@@ -15,13 +15,23 @@ public sealed class CommerceController : ControllerBase
     private readonly ICommerceRepository _commerceRepository;
     private readonly IAuthRepository _authRepository;
     private readonly IEmailDeliveryService _emailDeliveryService;
+    private readonly IOrderEmailDeliveryService _orderEmailDeliveryService;
+    private readonly ISupportEmailDeliveryService _supportEmailDeliveryService;
     private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public CommerceController(ICommerceRepository commerceRepository, IAuthRepository authRepository, IEmailDeliveryService emailDeliveryService, IWebHostEnvironment webHostEnvironment)
+    public CommerceController(
+        ICommerceRepository commerceRepository,
+        IAuthRepository authRepository,
+        IEmailDeliveryService emailDeliveryService,
+        IOrderEmailDeliveryService orderEmailDeliveryService,
+        ISupportEmailDeliveryService supportEmailDeliveryService,
+        IWebHostEnvironment webHostEnvironment)
     {
         _commerceRepository = commerceRepository;
         _authRepository = authRepository;
         _emailDeliveryService = emailDeliveryService;
+        _orderEmailDeliveryService = orderEmailDeliveryService;
+        _supportEmailDeliveryService = supportEmailDeliveryService;
         _webHostEnvironment = webHostEnvironment;
     }
 
@@ -41,7 +51,7 @@ public sealed class CommerceController : ControllerBase
         return Ok(plans);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpPost("products")]
     public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
@@ -70,7 +80,7 @@ public sealed class CommerceController : ControllerBase
 
                     foreach (var email in recipients)
                     {
-                        await _emailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
+                        await _supportEmailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
                     }
                 }
                 catch
@@ -82,7 +92,7 @@ public sealed class CommerceController : ControllerBase
         return created is null ? NotFound() : Ok(created);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpPost("products/{productId:long}/notify")]
     public async Task<ActionResult> NotifyProduct([FromRoute] long productId, CancellationToken cancellationToken)
     {
@@ -104,7 +114,7 @@ public sealed class CommerceController : ControllerBase
         var sent = 0;
         foreach (var email in recipients)
         {
-            var (success, _) = await _emailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
+            var (success, _) = await _supportEmailDeliveryService.SendHtmlEmailAsync(email, subject, body, cancellationToken);
             if (success)
             {
                 sent++;
@@ -114,7 +124,156 @@ public sealed class CommerceController : ControllerBase
         return Ok(new { success = true, message = $"Notification sent to {sent} user(s)." });
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Orders")]
+    [HttpGet("active-plans")]
+    public async Task<ActionResult<IReadOnlyList<ActivePlanDto>>> GetActivePlans(CancellationToken cancellationToken)
+    {
+        var plans = await _commerceRepository.GetUserPlansForAdminAsync(cancellationToken);
+        return Ok(plans);
+    }
+
+    [Authorize(Roles = "Admin,Admin.Orders")]
+    [HttpPost("active-plans/{orderId:long}/remind")]
+    public async Task<ActionResult> RemindPlan([FromRoute] long orderId, CancellationToken cancellationToken)
+    {
+        var result = await TrySendPlanReminderAsync(orderId, cancellationToken);
+        if (!result.Found)
+        {
+            return NotFound();
+        }
+
+        if (!result.Eligible)
+        {
+            return BadRequest(new { success = false, message = result.Message });
+        }
+
+        return result.Sent
+            ? Ok(new { success = true })
+            : StatusCode(StatusCodes.Status502BadGateway, new { success = false, message = result.Message });
+    }
+
+    [Authorize(Roles = "Admin,Admin.Orders")]
+    [HttpPost("active-plans/remind-bulk")]
+    public async Task<ActionResult> RemindPlansBulk([FromBody] BulkPlanReminderRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var ids = request.OrderIds
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(2000)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return BadRequest(new { success = false, message = "No order ids provided." });
+        }
+
+        var sent = 0;
+        var skipped = 0;
+        var failed = 0;
+
+        foreach (var orderId in ids)
+        {
+            var result = await TrySendPlanReminderAsync(orderId, cancellationToken);
+            if (!result.Found || !result.Eligible)
+            {
+                skipped++;
+                continue;
+            }
+
+            if (result.Sent)
+            {
+                sent++;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        return Ok(new
+        {
+            success = true,
+            sent,
+            skipped,
+            failed
+        });
+    }
+
+    private sealed record PlanReminderAttempt(bool Found, bool Eligible, bool Sent, string Message);
+
+    private async Task<PlanReminderAttempt> TrySendPlanReminderAsync(long orderId, CancellationToken cancellationToken)
+    {
+        var trace = await _commerceRepository.GetOrderTraceByIdAsync(orderId, cancellationToken);
+        if (trace is null)
+        {
+            return new PlanReminderAttempt(Found: false, Eligible: false, Sent: false, Message: "Order not found.");
+        }
+
+        var product = await _commerceRepository.GetProductByIdAsync(trace.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return new PlanReminderAttempt(Found: false, Eligible: false, Sent: false, Message: "Product not found.");
+        }
+
+        var now = DateTime.UtcNow;
+        var validToUtc = product.ValidToUtc;
+        if (validToUtc is null)
+        {
+            return new PlanReminderAttempt(Found: true, Eligible: false, Sent: false, Message: "Plan does not have a valid-to date.");
+        }
+
+        var reminderType =
+            validToUtc.Value >= now && validToUtc.Value <= now.AddDays(30) ? "ExpiringSoon" :
+            validToUtc.Value < now && validToUtc.Value >= now.AddDays(-30) ? "Expired" :
+            "None";
+
+        if (reminderType == "None")
+        {
+            return new PlanReminderAttempt(Found: true, Eligible: false, Sent: false, Message: "Plan is not eligible for notification.");
+        }
+
+        var plan = new ActivePlanDto
+        {
+            OrderId = trace.OrderId,
+            UserId = trace.UserId,
+            UserEmail = trace.UserEmail ?? string.Empty,
+            UserFullName = trace.UserFullName ?? string.Empty,
+            ProductId = trace.ProductId,
+            ProductName = trace.ProductName ?? string.Empty,
+            UnitPrice = trace.UnitPrice,
+            Quantity = trace.Quantity,
+            OrderedAtUtc = trace.OrderedAtUtc,
+            ValidFromUtc = product.ValidFromUtc,
+            ValidToUtc = product.ValidToUtc,
+            ReminderType = reminderType,
+            IsEligibleForReminder = true
+        };
+
+        if (string.IsNullOrWhiteSpace(plan.UserEmail))
+        {
+            return new PlanReminderAttempt(Found: true, Eligible: false, Sent: false, Message: "User email is missing.");
+        }
+
+        var subject = reminderType == "ExpiringSoon"
+            ? $"Expiring soon: {plan.ProductName}"
+            : $"Expired: {plan.ProductName}";
+
+        var body = reminderType == "ExpiringSoon"
+            ? PlanExpiringSoonHtmlRenderer.Render(product, plan)
+            : PlanExpiredHtmlRenderer.Render(product, plan);
+
+        var (success, error) = await _orderEmailDeliveryService.SendHtmlEmailAsync(plan.UserEmail, subject, body, cancellationToken);
+        return success
+            ? new PlanReminderAttempt(Found: true, Eligible: true, Sent: true, Message: "Sent.")
+            : new PlanReminderAttempt(Found: true, Eligible: true, Sent: false, Message: error ?? "Failed to send email.");
+    }
+
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpPut("products/{productId:long}")]
     public async Task<ActionResult<ProductDto>> UpdateProduct([FromRoute] long productId, [FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
@@ -133,7 +292,7 @@ public sealed class CommerceController : ControllerBase
         return product is null ? NotFound() : Ok(product);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpPatch("products/{productId:long}/soft-delete")]
     public async Task<ActionResult<ProductDto>> SoftDeleteProduct([FromRoute] long productId, CancellationToken cancellationToken)
     {
@@ -147,7 +306,7 @@ public sealed class CommerceController : ControllerBase
         return product is null ? NotFound() : Ok(product);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpPut("products/{productId:long}/active/{isActive:bool}")]
     public async Task<ActionResult<ProductDto>> SetProductActive([FromRoute] long productId, [FromRoute] bool isActive, CancellationToken cancellationToken)
     {
@@ -161,7 +320,7 @@ public sealed class CommerceController : ControllerBase
         return product is null ? NotFound() : Ok(product);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Products")]
     [HttpDelete("products/{productId:long}/force")]
     public async Task<ActionResult> ForceDeleteProduct([FromRoute] long productId, CancellationToken cancellationToken)
     {
@@ -298,7 +457,7 @@ public sealed class CommerceController : ControllerBase
         return Ok(faqs);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Faq")]
     [HttpGet("faqs/admin")]
     public async Task<ActionResult<IReadOnlyList<FaqDto>>> GetAdminFaqs(CancellationToken cancellationToken)
     {
@@ -306,7 +465,7 @@ public sealed class CommerceController : ControllerBase
         return Ok(faqs);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Faq")]
     [HttpPost("faqs")]
     public async Task<ActionResult<FaqDto>> CreateFaq([FromBody] CreateFaqRequest request, CancellationToken cancellationToken)
     {
@@ -320,7 +479,7 @@ public sealed class CommerceController : ControllerBase
         return created is null ? NotFound() : Ok(created);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Faq")]
     [HttpPut("faqs/{faqId:long}")]
     public async Task<ActionResult<FaqDto>> UpdateFaq([FromRoute] long faqId, [FromBody] CreateFaqRequest request, CancellationToken cancellationToken)
     {
@@ -339,7 +498,7 @@ public sealed class CommerceController : ControllerBase
         return faq is null ? NotFound() : Ok(faq);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Faq")]
     [HttpPut("faqs/{faqId:long}/active/{isActive:bool}")]
     public async Task<ActionResult<FaqDto>> SetFaqActive([FromRoute] long faqId, [FromRoute] bool isActive, CancellationToken cancellationToken)
     {
@@ -351,6 +510,14 @@ public sealed class CommerceController : ControllerBase
 
         var faq = await _commerceRepository.GetFaqByIdAsync(faqId, cancellationToken);
         return faq is null ? NotFound() : Ok(faq);
+    }
+
+    [Authorize(Roles = "Admin,Admin.Faq")]
+    [HttpDelete("faqs/{faqId:long}")]
+    public async Task<ActionResult> DeleteFaq([FromRoute] long faqId, CancellationToken cancellationToken)
+    {
+        var deleted = await _commerceRepository.DeleteFaqAsync(faqId, cancellationToken);
+        return deleted ? Ok(new { success = true }) : NotFound();
     }
 
     [AllowAnonymous]
@@ -371,7 +538,7 @@ public sealed class CommerceController : ControllerBase
         });
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Contact")]
     [HttpGet("contact-messages")]
     public async Task<ActionResult<IReadOnlyList<ContactMessageDto>>> GetContactMessages(CancellationToken cancellationToken)
     {
@@ -379,7 +546,15 @@ public sealed class CommerceController : ControllerBase
         return Ok(messages);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Contact")]
+    [HttpDelete("contact-messages/{contactMessageId:long}")]
+    public async Task<ActionResult> DeleteContactMessage([FromRoute] long contactMessageId, CancellationToken cancellationToken)
+    {
+        var deleted = await _commerceRepository.DeleteContactMessageAsync(contactMessageId, cancellationToken);
+        return deleted ? Ok(new { success = true }) : NotFound();
+    }
+
+    [Authorize(Roles = "Admin,Admin.Contact")]
     [HttpPost("contact-messages/{contactMessageId:long}/reply")]
     public async Task<ActionResult<AuthResponse>> ReplyToContactMessage([FromRoute] long contactMessageId, [FromBody] SendContactReplyRequest request, CancellationToken cancellationToken)
     {
@@ -398,7 +573,7 @@ public sealed class CommerceController : ControllerBase
             });
         }
 
-        var result = await _emailDeliveryService.SendPlainTextEmailAsync(contactMessage.Email, request.Subject, request.Message, cancellationToken);
+        var result = await _supportEmailDeliveryService.SendPlainTextEmailAsync(contactMessage.Email, request.Subject, request.Message, cancellationToken);
         if (!result.Success)
         {
             return BadRequest(new AuthResponse
@@ -510,7 +685,38 @@ public sealed class CommerceController : ControllerBase
         return created is null ? NotFound() : Ok(created);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [HttpDelete("support/my/{queryId:long}")]
+    public async Task<ActionResult> DeleteMySupportQuery([FromRoute] long queryId, CancellationToken cancellationToken)
+    {
+        var userId = ResolveUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var query = await _commerceRepository.GetSupportQueryByIdAsync(queryId, cancellationToken);
+        if (query is null)
+        {
+            return NotFound();
+        }
+
+        if (query.UserId != userId.Value)
+        {
+            return Forbid();
+        }
+
+        // Safety: if admin already replied, do not allow deletion (keeps audit trail).
+        var hasAdmin = await _commerceRepository.SupportQueryHasAdminMessagesAsync(queryId, cancellationToken);
+        if (hasAdmin)
+        {
+            return BadRequest(new { success = false, message = "Cannot delete this ticket after admin has replied. You can close it instead." });
+        }
+
+        var deleted = await _commerceRepository.DeleteSupportQueryAsync(queryId, cancellationToken);
+        return deleted ? NoContent() : NotFound();
+    }
+
+    [Authorize(Roles = "Admin,Admin.Support")]
     [HttpGet("support/trace")]
     public async Task<ActionResult<IReadOnlyList<SupportQueryDto>>> GetSupportTrace(CancellationToken cancellationToken)
     {
@@ -518,7 +724,7 @@ public sealed class CommerceController : ControllerBase
         return Ok(trace);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Support")]
     [HttpGet("support/{queryId:long}/messages")]
     public async Task<ActionResult<IReadOnlyList<SupportQueryMessageDto>>> GetSupportMessages([FromRoute] long queryId, CancellationToken cancellationToken)
     {
@@ -532,7 +738,7 @@ public sealed class CommerceController : ControllerBase
         return Ok(messages);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Support")]
     [HttpPost("support/{queryId:long}/messages")]
     public async Task<ActionResult<SupportQueryMessageDto>> CreateAdminSupportQueryMessage([FromRoute] long queryId, [FromBody] CreateSupportQueryMessageRequest request, CancellationToken cancellationToken)
     {
@@ -554,7 +760,7 @@ public sealed class CommerceController : ControllerBase
         return created is null ? NotFound() : Ok(created);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Support")]
     [HttpPatch("support/{queryId:long}/status")]
     public async Task<ActionResult> UpdateSupportQueryStatus([FromRoute] long queryId, [FromBody] UpdateSupportQueryStatusRequest request, CancellationToken cancellationToken)
     {
@@ -567,7 +773,33 @@ public sealed class CommerceController : ControllerBase
         return updated ? NoContent() : NotFound();
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Support")]
+    [HttpPost("support/{queryId:long}/close")]
+    public async Task<ActionResult> CloseSupportQuery([FromRoute] long queryId, [FromBody] CloseSupportTicketRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var query = await _commerceRepository.GetSupportQueryByIdAsync(queryId, cancellationToken);
+        if (query is null)
+        {
+            return NotFound();
+        }
+
+        var adminUserId = ResolveUserId();
+        var closingText = string.IsNullOrWhiteSpace(request.Message)
+            ? "✅ This ticket has been closed. If you still need help, please open a new ticket from your dashboard."
+            : request.Message.Trim();
+
+        await _commerceRepository.CreateSupportQueryMessageAsync(queryId, AuthRoles.Admin, adminUserId, closingText, cancellationToken);
+        await _commerceRepository.UpdateSupportQueryStatusAsync(queryId, "Closed", cancellationToken);
+
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin,Admin.Orders")]
     [HttpGet("orders/trace")]
     public async Task<ActionResult<IReadOnlyList<OrderTraceDto>>> GetOrderTrace(CancellationToken cancellationToken)
     {
@@ -575,7 +807,23 @@ public sealed class CommerceController : ControllerBase
         return Ok(trace);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Orders")]
+    [HttpGet("orders/trace/export/pdf")]
+    public async Task<IActionResult> ExportOrderTracePdf([FromQuery] string? q, CancellationToken cancellationToken)
+    {
+        var trace = await _commerceRepository.GetOrderTraceAsync(cancellationToken);
+        var filter = (q ?? string.Empty).Trim();
+
+        var filtered = string.IsNullOrWhiteSpace(filter)
+            ? trace.ToList()
+            : trace.Where(o => MatchesOrderFilter(o, filter)).ToList();
+
+        var pdfBytes = OrdersPdfExporter.Render(filtered, filter);
+        var fileName = $"orders-{DateTime.UtcNow:yyyyMMdd-HHmm}.pdf";
+        return File(pdfBytes, "application/pdf", fileName);
+    }
+
+    [Authorize(Roles = "Admin,Admin.Orders")]
     [HttpPatch("orders/{orderId:long}/status")]
     public async Task<ActionResult> UpdateOrderStatus([FromRoute] long orderId, [FromBody] UpdateOrderStatusRequest request, CancellationToken cancellationToken)
     {
@@ -601,7 +849,7 @@ public sealed class CommerceController : ControllerBase
             finalized.Status = newStatus;
             var html = InvoiceHtmlRenderer.RenderOrderInvoiceHtml(finalized, currencyCountryCode: "US");
             var subject = $"Your Kohinoorea Invoice (ORD-{finalized.OrderId})";
-            await _emailDeliveryService.SendHtmlEmailAsync(finalized.UserEmail, subject, html, cancellationToken);
+            await _orderEmailDeliveryService.SendHtmlEmailAsync(finalized.UserEmail, subject, html, cancellationToken);
         }
 
         return updated ? NoContent() : NotFound();
@@ -611,5 +859,26 @@ public sealed class CommerceController : ControllerBase
     {
         var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return long.TryParse(claimValue, out var userId) ? userId : null;
+    }
+
+    private static bool MatchesOrderFilter(OrderTraceDto order, string filter)
+    {
+        var needle = filter.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(needle))
+        {
+            return true;
+        }
+
+        static bool Contains(string? value, string n) =>
+            !string.IsNullOrWhiteSpace(value) && value.Trim().ToLowerInvariant().Contains(n);
+
+        return Contains(order.ProductName, needle)
+               || Contains(order.UserFullName, needle)
+               || Contains(order.UserEmail, needle)
+               || Contains(order.Status, needle)
+               || Contains($"ord-{order.OrderId}", needle)
+               || Contains(order.OrderId.ToString(), needle)
+               || Contains(order.Quantity.ToString(), needle)
+               || Contains(order.TotalAmount.ToString(), needle);
     }
 }

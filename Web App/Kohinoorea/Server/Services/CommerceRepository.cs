@@ -29,6 +29,8 @@ public sealed class CommerceRepository : ICommerceRepository
                 AuthSqlKataSchema.ProductColumns.IsActive,
                 AuthSqlKataSchema.ProductColumns.IsMaster,
                 AuthSqlKataSchema.ProductColumns.CountryCode,
+                AuthSqlKataSchema.ProductColumns.ValidFromUtc,
+                AuthSqlKataSchema.ProductColumns.ValidToUtc,
                 AuthSqlKataSchema.ProductColumns.CreatedAtUtc)
             .OrderByDesc(AuthSqlKataSchema.ProductColumns.CreatedAtUtc);
 
@@ -85,6 +87,8 @@ public sealed class CommerceRepository : ICommerceRepository
                 [AuthSqlKataSchema.ProductColumns.IsActive] = request.IsActive,
                 [AuthSqlKataSchema.ProductColumns.IsMaster] = request.IsMaster,
                 [AuthSqlKataSchema.ProductColumns.CountryCode] = string.IsNullOrWhiteSpace(request.CountryCode) ? null : request.CountryCode.ToUpperInvariant().Trim(),
+                [AuthSqlKataSchema.ProductColumns.ValidFromUtc] = request.ValidFromUtc,
+                [AuthSqlKataSchema.ProductColumns.ValidToUtc] = request.ValidToUtc,
                 [AuthSqlKataSchema.ProductColumns.CreatedAtUtc] = now
             }, cancellationToken: cancellationToken);
     }
@@ -102,7 +106,9 @@ public sealed class CommerceRepository : ICommerceRepository
                 [AuthSqlKataSchema.ProductColumns.Price] = request.Price,
                 [AuthSqlKataSchema.ProductColumns.IsActive] = request.IsActive,
                 [AuthSqlKataSchema.ProductColumns.IsMaster] = request.IsMaster,
-                [AuthSqlKataSchema.ProductColumns.CountryCode] = string.IsNullOrWhiteSpace(request.CountryCode) ? null : request.CountryCode.ToUpperInvariant().Trim()
+                [AuthSqlKataSchema.ProductColumns.CountryCode] = string.IsNullOrWhiteSpace(request.CountryCode) ? null : request.CountryCode.ToUpperInvariant().Trim(),
+                [AuthSqlKataSchema.ProductColumns.ValidFromUtc] = request.ValidFromUtc,
+                [AuthSqlKataSchema.ProductColumns.ValidToUtc] = request.ValidToUtc
             }, cancellationToken: cancellationToken);
 
         return affected > 0;
@@ -284,6 +290,16 @@ public sealed class CommerceRepository : ICommerceRepository
         return affected > 0;
     }
 
+    public async Task<bool> DeleteFaqAsync(long faqId, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.FaqsTable)
+            .Where(AuthSqlKataSchema.FaqColumns.Id, faqId)
+            .DeleteAsync(cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
     public async Task<IReadOnlyList<ContactMessageDto>> GetContactMessagesAsync(CancellationToken cancellationToken = default)
     {
         var rows = await _queryFactory
@@ -346,6 +362,16 @@ public sealed class CommerceRepository : ICommerceRepository
                 [AuthSqlKataSchema.ContactMessageColumns.IsReplied] = true,
                 [AuthSqlKataSchema.ContactMessageColumns.LastRepliedAtUtc] = repliedAtUtc
             }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
+    public async Task<bool> DeleteContactMessageAsync(long contactMessageId, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.ContactMessagesTable)
+            .Where(AuthSqlKataSchema.ContactMessageColumns.Id, contactMessageId)
+            .DeleteAsync(cancellationToken: cancellationToken);
 
         return affected > 0;
     }
@@ -498,6 +524,7 @@ public sealed class CommerceRepository : ICommerceRepository
             .SelectRaw("o.id as OrderId")
             .SelectRaw("o.product_id as ProductId")
             .SelectRaw("p.name as ProductName")
+            .SelectRaw("o.payment_method as PaymentMethod")
             .SelectRaw("o.unit_price as UnitPrice")
             .SelectRaw("o.quantity as Quantity")
             .SelectRaw("o.total_amount as TotalAmount")
@@ -521,5 +548,95 @@ public sealed class CommerceRepository : ICommerceRepository
             }, cancellationToken: cancellationToken);
 
         return affected > 0;
+    }
+
+    public async Task<bool> SupportQueryHasAdminMessagesAsync(long queryId, CancellationToken cancellationToken = default)
+    {
+        var exists = await _queryFactory
+            .Query(AuthSqlKataSchema.SupportQueryMessagesTable)
+            .Where(AuthSqlKataSchema.SupportQueryMessageColumns.QueryId, queryId)
+            .Where(AuthSqlKataSchema.SupportQueryMessageColumns.SenderRole, AuthRoles.Admin)
+            .ExistsAsync(cancellationToken: cancellationToken);
+
+        return exists;
+    }
+
+    public async Task<bool> DeleteSupportQueryAsync(long queryId, CancellationToken cancellationToken = default)
+    {
+        // Delete messages first (FK safety), then delete the query.
+        await _queryFactory
+            .Query(AuthSqlKataSchema.SupportQueryMessagesTable)
+            .Where(AuthSqlKataSchema.SupportQueryMessageColumns.QueryId, queryId)
+            .DeleteAsync(cancellationToken: cancellationToken);
+
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.SupportQueriesTable)
+            .Where(AuthSqlKataSchema.SupportQueryColumns.Id, queryId)
+            .DeleteAsync(cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
+    public async Task<IReadOnlyList<ActivePlanDto>> GetUserPlansForAdminAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _queryFactory
+            .Query(AuthSqlKataSchema.OrdersTable + " as o")
+            .Join(AuthSqlKataSchema.ProductsTable + " as p", "o." + AuthSqlKataSchema.OrderColumns.ProductId, "p." + AuthSqlKataSchema.ProductColumns.Id)
+            .Join(AuthSqlKataSchema.UsersTable + " as u", "o." + AuthSqlKataSchema.OrderColumns.UserId, "u." + AuthSqlKataSchema.UserColumns.Id)
+            .SelectRaw("o.id as OrderId")
+            .SelectRaw("o.user_id as UserId")
+            .SelectRaw("u.email as UserEmail")
+            .SelectRaw("u.full_name as UserFullName")
+            .SelectRaw("o.product_id as ProductId")
+            .SelectRaw("p.name as ProductName")
+            .SelectRaw("o.payment_method as PaymentMethod")
+            .SelectRaw("o.unit_price as UnitPrice")
+            .SelectRaw("o.quantity as Quantity")
+            .SelectRaw("o.ordered_at_utc as OrderedAtUtc")
+            .SelectRaw("p.valid_from_utc as ValidFromUtc")
+            .SelectRaw("p.valid_to_utc as ValidToUtc")
+            .Where("o." + AuthSqlKataSchema.OrderColumns.Status, "Completed")
+            .OrderByDesc("o." + AuthSqlKataSchema.OrderColumns.OrderedAtUtc)
+            .GetAsync<ActivePlanDto>(cancellationToken: cancellationToken);
+
+        var now = DateTime.UtcNow;
+        foreach (var row in rows)
+        {
+            row.PlanState = ResolvePlanState(now, row.ValidFromUtc, row.ValidToUtc);
+            var (eligible, reminderType) = ResolveReminder(now, row.ValidToUtc);
+            row.IsEligibleForReminder = eligible;
+            row.ReminderType = reminderType;
+        }
+
+        return rows.ToList();
+    }
+
+    private static string ResolvePlanState(DateTime nowUtc, DateTime? validFromUtc, DateTime? validToUtc)
+    {
+        if (validFromUtc is null && validToUtc is null) return "Unknown";
+        if (validFromUtc is not null && nowUtc < validFromUtc.Value) return "Upcoming";
+        if (validToUtc is not null && nowUtc > validToUtc.Value) return "Expired";
+        return "Active";
+    }
+
+    private static (bool Eligible, string ReminderType) ResolveReminder(DateTime nowUtc, DateTime? validToUtc)
+    {
+        if (validToUtc is null) return (false, "None");
+
+        var end = validToUtc.Value;
+
+        // Expiring soon: within next 30 days (including today)
+        if (end >= nowUtc && end <= nowUtc.AddDays(30))
+        {
+            return (true, "ExpiringSoon");
+        }
+
+        // Expired: within last 30 days
+        if (end < nowUtc && end >= nowUtc.AddDays(-30))
+        {
+            return (true, "Expired");
+        }
+
+        return (false, "None");
     }
 }

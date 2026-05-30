@@ -12,10 +12,14 @@ using Google.Apis.Auth.OAuth2;
 using SqlKata.Compilers;
 using SqlKata.Execution;
 using System.Text;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+// QuestPDF (community license)
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Add services to the container.
 
@@ -74,6 +78,24 @@ builder.Services.AddScoped<QueryFactory>(sp =>
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ICommerceRepository, CommerceRepository>();
 builder.Services.AddScoped<IEmailDeliveryService, SmtpEmailDeliveryService>();
+builder.Services.AddScoped<IOrderEmailDeliveryService>(sp =>
+    new SmtpEmailDeliveryService(
+        sp.GetRequiredService<IConfiguration>(),
+        sp.GetRequiredService<ILogger<SmtpEmailDeliveryService>>(),
+        sp.GetRequiredService<IHostEnvironment>(),
+        settingsPrefix: "Orders:Smtp"));
+builder.Services.AddScoped<ISupportEmailDeliveryService>(sp =>
+    new SmtpEmailDeliveryService(
+        sp.GetRequiredService<IConfiguration>(),
+        sp.GetRequiredService<ILogger<SmtpEmailDeliveryService>>(),
+        sp.GetRequiredService<IHostEnvironment>(),
+        settingsPrefix: "Support:Smtp"));
+builder.Services.AddScoped<IAdminEmailDeliveryService>(sp =>
+    new SmtpEmailDeliveryService(
+        sp.GetRequiredService<IConfiguration>(),
+        sp.GetRequiredService<ILogger<SmtpEmailDeliveryService>>(),
+        sp.GetRequiredService<IHostEnvironment>(),
+        settingsPrefix: "Admin:Smtp"));
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddSingleton<IPasswordHasher<string>, PasswordHasher<string>>();
 

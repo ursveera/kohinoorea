@@ -1,6 +1,7 @@
 @page "/dashboard"
 @implements IDisposable
 @using System.Net
+@using System.Text.Json
 @using System.Text.RegularExpressions
 @using Kohinoorea.Client.Services
 
@@ -1314,6 +1315,10 @@
                       <button class="ghost-btn" type="button" @onclick="() => OpenQueryThreadAsync(query.Id)">
                         @(selectedQuery?.Id == query.Id ? "Chat Open" : "Open Chat")
                       </button>
+                      @if (CanDeleteTicket(query))
+                      {
+                        <button class="ghost-btn force" type="button" @onclick="() => DeleteTicketAsync(query.Id)">Delete</button>
+                      }
                     </div>
                   </div>
                 }
@@ -1386,25 +1391,30 @@
                 }
               </div>
 
-              <EditForm class="support-chat-composer" Model="replyRequest" OnValidSubmit="SubmitReplyAsync">
-                <DataAnnotationsValidator />
-                @if (IsClosedSupportTicket(selectedQuery.Status))
-                {
-                  <p class="summary-caption support-closed-note">This ticket is currently closed. Sending a message will reopen it and move it back to Open Tickets.</p>
-                }
-                <InputTextArea Value="@replyRequest.Message"
-                               ValueChanged="OnReplyMessageChangedAsync"
-                               ValueExpression="@(() => replyRequest.Message)"
-                               placeholder="Type your message..." />
-                @if (!string.IsNullOrWhiteSpace(realtimeTypingLine))
-                {
-                  <p class="empty-note" style="margin-top:6px;">@realtimeTypingLine</p>
-                }
-                <div class="composer-actions">
-                  <p class="empty-note">Admin replies stay inside this thread so your full support history is always visible.</p>
-                  <button class="submit-btn" type="submit">@(IsClosedSupportTicket(selectedQuery.Status) ? "Send & Reopen" : "Send Message")</button>
+              @if (IsClosedSupportTicket(selectedQuery.Status))
+              {
+                <div class="support-chat-composer" style="opacity:0.9;">
+                  <p class="summary-caption support-closed-note">This ticket is closed by admin. Please create a new ticket to continue.</p>
                 </div>
-              </EditForm>
+              }
+              else
+              {
+                <EditForm class="support-chat-composer" Model="replyRequest" OnValidSubmit="SubmitReplyAsync">
+                  <DataAnnotationsValidator />
+                  <InputTextArea Value="@replyRequest.Message"
+                                 ValueChanged="OnReplyMessageChangedAsync"
+                                 ValueExpression="@(() => replyRequest.Message)"
+                                 placeholder="Type your message..." />
+                  @if (!string.IsNullOrWhiteSpace(realtimeTypingLine))
+                  {
+                    <p class="empty-note" style="margin-top:6px;">@realtimeTypingLine</p>
+                  }
+                  <div class="composer-actions">
+                    <p class="empty-note">Admin replies stay inside this thread so your full support history is always visible.</p>
+                    <button class="submit-btn" type="submit">Send Message</button>
+                  </div>
+                </EditForm>
+              }
             }
           </div>
         </div>
@@ -1802,6 +1812,13 @@
         public string DisplayName { get; set; } = string.Empty;
     }
 
+    public sealed class SupportRealtimeMeta
+    {
+        public string? Status { get; set; }
+        public object? UpdatedAt { get; set; }
+        public string? LastMessage { get; set; }
+    }
+
     [JSInvokable]
     public async Task OnMessage(SupportRealtimeMessage message)
     {
@@ -1812,6 +1829,19 @@
 
         // Another party posted (after saving in DB); refresh the SQL-backed thread for canonical ordering/ids.
         await LoadThreadMessagesAsync(expandedQueryId.Value);
+
+        // Also refresh ticket list so Open/Closed counts and current ticket status update immediately.
+        await ReloadSupportQueriesAsync();
+
+        if (SelectedSupportQuery is not null && expandedQueryId.HasValue)
+        {
+            var fresh = queries.FirstOrDefault(q => q.Id == expandedQueryId.Value);
+            if (fresh is not null)
+            {
+                SelectedSupportQuery.Status = fresh.Status;
+            }
+        }
+
         await InvokeAsync(StateHasChanged);
     }
 
@@ -1834,6 +1864,42 @@
         }
 
         return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnMeta(SupportRealtimeMeta meta)
+    {
+        var status = meta?.Status?.Trim();
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return;
+        }
+
+        // Refresh tickets list for counters + status changes.
+        await ReloadSupportQueriesAsync();
+
+        if (expandedQueryId.HasValue && SelectedSupportQuery is not null)
+        {
+            // If admin closed the current ticket, lock the composer immediately.
+            SelectedSupportQuery.Status = status;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ReloadSupportQueriesAsync()
+    {
+        var response = await Http.GetAsync("api/commerce/support/my");
+        if (!response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<List<SupportQueryDto>>();
+        queries.Clear();
+        if (payload is not null)
+        {
+            queries.AddRange(payload);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -2082,6 +2148,52 @@
     private static bool IsClosedSupportTicket(string? status)
     {
         return string.Equals(status?.Trim(), "Closed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool CanDeleteTicket(SupportQueryDto query)
+    {
+        // Allow deletion only for tickets that appear untouched by admin:
+        // (Backend enforces this by rejecting tickets with admin messages.)
+        return query is not null && !IsClosedSupportTicket(query.Status);
+    }
+
+    private async Task DeleteTicketAsync(long queryId)
+    {
+        supportStatusMessage = null;
+
+        var response = await Http.DeleteAsync($"api/commerce/support/my/{queryId}");
+        if (!response.IsSuccessStatusCode)
+        {
+            try
+            {
+                var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("message", out var msg))
+                {
+                    supportStatusMessage = msg.GetString() ?? "Unable to delete ticket.";
+                }
+                else
+                {
+                    supportStatusMessage = "Unable to delete ticket.";
+                }
+            }
+            catch
+            {
+                supportStatusMessage = "Unable to delete ticket.";
+            }
+
+            return;
+        }
+
+        if (SelectedSupportQuery?.Id == queryId)
+        {
+            expandedQueryId = null;
+            activeQueryMessages.Clear();
+            replyRequest.Message = string.Empty;
+            realtimeTypingLine = string.Empty;
+        }
+
+        await ReloadSupportQueriesAsync();
+        supportStatusMessage = "Ticket deleted.";
     }
 
     private static string GetOrderStatusLabel(string? status)

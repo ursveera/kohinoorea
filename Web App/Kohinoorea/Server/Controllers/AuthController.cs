@@ -18,15 +18,20 @@ public sealed class AuthController : ControllerBase
     private readonly IPasswordHasher<string> _passwordHasher;
     private readonly IConfiguration _configuration;
     private readonly IEmailOtpService _emailOtpService;
-    private readonly IEmailDeliveryService _emailDeliveryService;
+    private readonly IAdminEmailDeliveryService _adminEmailDeliveryService;
 
-    public AuthController(IAuthRepository authRepository, IPasswordHasher<string> passwordHasher, IConfiguration configuration, IEmailOtpService emailOtpService, IEmailDeliveryService emailDeliveryService)
+    public AuthController(
+        IAuthRepository authRepository,
+        IPasswordHasher<string> passwordHasher,
+        IConfiguration configuration,
+        IEmailOtpService emailOtpService,
+        IAdminEmailDeliveryService adminEmailDeliveryService)
     {
         _authRepository = authRepository;
         _passwordHasher = passwordHasher;
         _configuration = configuration;
         _emailOtpService = emailOtpService;
-        _emailDeliveryService = emailDeliveryService;
+        _adminEmailDeliveryService = adminEmailDeliveryService;
     }
 
     [HttpPost("email-otp/send")]
@@ -144,6 +149,10 @@ public sealed class AuthController : ControllerBase
             UserId = user.Id,
             Email = user.Email,
             Role = user.Role,
+            Roles = (string.IsNullOrWhiteSpace(user.Role) ? AuthRoles.User : user.Role.Trim())
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             Token = token,
             ExpiresAtUtc = expiresAtUtc
         });
@@ -157,7 +166,16 @@ public sealed class AuthController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         long? userId = long.TryParse(userIdClaim, out var parsedUserId) ? parsedUserId : null;
 
-        var role = User.FindFirstValue(ClaimTypes.Role);
+        var roles = User.Claims
+            .Where(c => string.Equals(c.Type, ClaimTypes.Role, StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var role = roles.Contains(AuthRoles.Admin, StringComparer.OrdinalIgnoreCase)
+            ? AuthRoles.Admin
+            : roles.Contains(AuthRoles.User, StringComparer.OrdinalIgnoreCase) ? AuthRoles.User : roles.FirstOrDefault();
 
         return Ok(new AuthResponse
         {
@@ -165,11 +183,12 @@ public sealed class AuthController : ControllerBase
             Message = "Token is valid.",
             UserId = userId,
             Email = email,
-            Role = role
+            Role = role,
+            Roles = roles
         });
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Customers")]
     [HttpGet("users")]
     public async Task<ActionResult<IReadOnlyList<AdminUserDto>>> GetUsers(CancellationToken cancellationToken)
     {
@@ -177,7 +196,101 @@ public sealed class AuthController : ControllerBase
         return Ok(users);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Admins")]
+    [HttpGet("admins")]
+    public async Task<ActionResult<IReadOnlyList<AdminUserDto>>> GetAdmins(CancellationToken cancellationToken)
+    {
+        var admins = await _authRepository.GetAdminsAsync(cancellationToken);
+        return Ok(admins);
+    }
+
+    [Authorize(Roles = "Admin,Admin.Admins")]
+    [HttpPost("admins")]
+    public async Task<ActionResult<AuthResponse>> CreateAdmin([FromBody] CreateAdminRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "Invalid admin request." });
+        }
+
+        var existing = await _authRepository.GetUserByEmailAsync(request.Email, cancellationToken);
+        if (existing is not null)
+        {
+            return Conflict(new AuthResponse { Success = false, Message = "An account with this email already exists." });
+        }
+
+        var passwordHash = _passwordHasher.HashPassword(request.Email.Trim().ToLowerInvariant(), request.Password);
+        var id = await _authRepository.CreateAdminAsync(request, passwordHash, cancellationToken);
+        return Ok(new AuthResponse { Success = true, Message = "Admin created.", UserId = id, Email = request.Email.Trim().ToLowerInvariant(), Role = AuthRoles.Admin });
+    }
+
+    [Authorize(Roles = "Admin,Admin.Admins")]
+    [HttpPut("admins/{adminUserId:long}")]
+    public async Task<ActionResult<AuthResponse>> UpdateAdmin([FromRoute] long adminUserId, [FromBody] UpdateAdminRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "Invalid admin request." });
+        }
+
+        var updated = await _authRepository.UpdateAdminAsync(adminUserId, request, cancellationToken);
+        return updated
+            ? Ok(new AuthResponse { Success = true, Message = "Admin updated.", UserId = adminUserId })
+            : NotFound(new AuthResponse { Success = false, Message = "Admin not found." });
+    }
+
+    [Authorize(Roles = "Admin,Admin.Admins")]
+    [HttpPut("admins/{adminUserId:long}/password")]
+    public async Task<ActionResult<AuthResponse>> ResetAdminPassword([FromRoute] long adminUserId, [FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "Invalid password request." });
+        }
+
+        var currentUserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (long.TryParse(currentUserIdClaim, out var currentUserId) && currentUserId == adminUserId)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "You cannot reset your own password from this screen." });
+        }
+
+        var admins = await _authRepository.GetAdminsAsync(cancellationToken);
+        var admin = admins.FirstOrDefault(a => a.Id == adminUserId);
+        if (admin is null)
+        {
+            return NotFound(new AuthResponse { Success = false, Message = "Admin not found." });
+        }
+
+        var passwordHash = _passwordHasher.HashPassword(admin.Email, request.NewPassword);
+        var updated = await _authRepository.UpdateUserPasswordHashAsync(adminUserId, passwordHash, cancellationToken);
+        return updated
+            ? Ok(new AuthResponse { Success = true, Message = "Password updated.", UserId = adminUserId })
+            : NotFound(new AuthResponse { Success = false, Message = "Admin not found." });
+    }
+
+    [Authorize(Roles = "Admin,Admin.Admins")]
+    [HttpDelete("admins/{adminUserId:long}")]
+    public async Task<ActionResult<AuthResponse>> DeleteAdmin([FromRoute] long adminUserId, CancellationToken cancellationToken)
+    {
+        var currentUserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (long.TryParse(currentUserIdClaim, out var currentUserId) && currentUserId == adminUserId)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = "You cannot delete your own admin account." });
+        }
+
+        var admins = await _authRepository.GetAdminsAsync(cancellationToken);
+        if (admins.All(a => a.Id != adminUserId))
+        {
+            return NotFound(new AuthResponse { Success = false, Message = "Admin not found." });
+        }
+
+        var deleted = await _authRepository.DeleteUserAsync(adminUserId, cancellationToken);
+        return deleted
+            ? Ok(new AuthResponse { Success = true, Message = "Admin deleted.", UserId = adminUserId })
+            : NotFound(new AuthResponse { Success = false, Message = "Admin not found." });
+    }
+
+    [Authorize(Roles = "Admin,Admin.Customers")]
     [HttpPut("users/{userId:long}/active/{isActive:bool}")]
     public async Task<ActionResult> SetUserActive([FromRoute] long userId, [FromRoute] bool isActive, CancellationToken cancellationToken)
     {
@@ -209,7 +322,7 @@ public sealed class AuthController : ControllerBase
         });
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Notifications")]
     [HttpGet("follow-up-leads")]
     public async Task<ActionResult<IReadOnlyList<AdminLeadNotificationDto>>> GetFollowUpLeads(CancellationToken cancellationToken)
     {
@@ -217,7 +330,7 @@ public sealed class AuthController : ControllerBase
         return Ok(leads);
     }
 
-    [Authorize(Roles = AuthRoles.Admin)]
+    [Authorize(Roles = "Admin,Admin.Notifications")]
     [HttpPost("follow-up-leads/{userId:long}/email")]
     public async Task<ActionResult<AuthResponse>> SendFollowUpLeadEmail([FromRoute] long userId, [FromBody] SendLeadFollowUpEmailRequest request, CancellationToken cancellationToken)
     {
@@ -240,7 +353,7 @@ public sealed class AuthController : ControllerBase
             });
         }
 
-        var (success, message) = await _emailDeliveryService.SendPlainTextEmailAsync(lead.Email, request.Subject, request.Message, cancellationToken);
+        var (success, message) = await _adminEmailDeliveryService.SendPlainTextEmailAsync(lead.Email, request.Subject, request.Message, cancellationToken);
         if (!success)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new AuthResponse
@@ -267,13 +380,32 @@ public sealed class AuthController : ControllerBase
         var audience = _configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience is not configured.");
         var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 
+        var roleValue = string.IsNullOrWhiteSpace(user.Role) ? AuthRoles.User : user.Role.Trim();
+        var roleClaims = roleValue
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (string.Equals(roleValue, AuthRoles.User, StringComparison.OrdinalIgnoreCase))
+        {
+            roleClaims = new List<string> { AuthRoles.User };
+        }
+        else if (!roleClaims.Any(r => string.Equals(r, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase)))
+        {
+            roleClaims.Insert(0, AuthRoles.Admin);
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? AuthRoles.User : user.Role)
+            new(ClaimTypes.Name, user.FullName)
         };
+
+        foreach (var roleClaim in roleClaims)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, roleClaim));
+        }
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);

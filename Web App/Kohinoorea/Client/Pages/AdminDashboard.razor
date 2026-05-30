@@ -1,7 +1,9 @@
 @page "/admin-dashboard"
 @implements IDisposable
 @using System.Text.RegularExpressions
+@using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
 @using Kohinoorea.Client.Services
 
 <PageTitle>Kohinoorea Admin Dashboard</PageTitle>
@@ -396,6 +398,250 @@
 
   .filter-box {
     margin-bottom: 16px;
+  }
+
+  .role-toggle-bar {
+    display: flex;
+    gap: .65rem;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75rem .85rem;
+    border: 1px solid var(--d-panel-border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    border-radius: 16px;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.18);
+    margin-top: .25rem;
+  }
+
+  .role-toggle-actions {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .role-chip {
+    appearance: none;
+    border: 1px solid var(--d-ghost-border);
+    background: rgba(15, 23, 42, 0.55);
+    color: var(--d-ghost-text);
+    padding: .5rem .7rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: .9rem;
+    letter-spacing: .2px;
+    display: inline-flex;
+    gap: .45rem;
+    align-items: center;
+    cursor: pointer;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+    user-select: none;
+  }
+
+  .role-chip:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+  }
+
+  .role-chip:active {
+    transform: translateY(0px) scale(0.99);
+  }
+
+  .role-chip.selected {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(249,115,22,0.10));
+    box-shadow: 0 14px 45px rgba(251,191,36,0.12);
+    color: var(--d-text);
+  }
+
+  .role-chip .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.55);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08);
+  }
+
+  .role-chip.selected .dot {
+    background: radial-gradient(circle at 30% 30%, #fde68a 0%, #fbbf24 40%, #d97706 100%);
+    box-shadow: 0 0 0 3px rgba(251,191,36,0.12);
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap: .6rem;
+    margin-top: .75rem;
+  }
+
+  @@media (max-width: 1050px) {
+    .role-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  }
+
+  .role-tile {
+    border: 1px solid var(--d-panel-border);
+    background: rgba(255,255,255,0.04);
+    border-radius: 16px;
+    padding: .75rem .85rem;
+    cursor: pointer;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+
+  .role-tile:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.07);
+    box-shadow: 0 14px 50px rgba(0,0,0,0.22);
+  }
+
+  .role-tile.selected {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(34,197,94,0.06));
+  }
+
+  .role-tile strong {
+    color: var(--d-text);
+    font-size: 1rem;
+    letter-spacing: .2px;
+  }
+
+  .role-tile small {
+    display: block;
+    margin-top: .15rem;
+    color: var(--d-muted);
+    font-weight: 600;
+    font-size: .82rem;
+  }
+
+  .role-pill {
+    min-width: 56px;
+    text-align: center;
+    padding: .3rem .55rem;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: .8rem;
+    border: 1px solid var(--d-ghost-border);
+    background: rgba(15,23,42,0.55);
+    color: var(--d-ghost-text);
+  }
+
+  .role-tile.selected .role-pill {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16,185,129,0.14);
+    color: var(--d-text);
+  }
+
+  .admin-form-card {
+    border: 1px solid var(--d-panel-border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    border-radius: 18px;
+    padding: 1rem 1rem;
+    box-shadow: 0 22px 70px rgba(0,0,0,0.24);
+  }
+
+  .admin-input {
+    width: 100%;
+    padding: .78rem .9rem;
+    border-radius: 14px;
+    border: 1px solid var(--d-input-border);
+    background: var(--d-input-bg);
+    color: var(--d-input-text);
+    outline: none;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .12s ease;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  }
+
+  .admin-input::placeholder {
+    color: rgba(123, 143, 168, 0.9);
+    font-weight: 600;
+  }
+
+  .admin-input:focus {
+    border-color: rgba(251,191,36,0.35);
+    box-shadow: 0 0 0 5px rgba(251,191,36,0.12);
+  }
+
+  .admin-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .9rem;
+  }
+
+  @@media (max-width: 900px) {
+    .admin-grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .admin-actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .admin-btn {
+    border-radius: 14px;
+    border: 1px solid var(--d-ghost-border);
+    background: rgba(15,23,42,0.55);
+    color: var(--d-ghost-text);
+    padding: .6rem .85rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+  }
+
+  .admin-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,0.08); box-shadow: 0 12px 32px rgba(0,0,0,0.22); }
+  .admin-btn:active { transform: translateY(0px) scale(0.99); }
+
+  .admin-btn.primary {
+    border-color: rgba(251,191,36,0.35);
+    background: linear-gradient(135deg, rgba(251,191,36,0.22), rgba(249,115,22,0.14));
+    color: var(--d-text);
+    box-shadow: 0 16px 45px rgba(251,191,36,0.12);
+  }
+
+  .admin-btn.danger {
+    border-color: rgba(239,68,68,0.35);
+    background: linear-gradient(135deg, rgba(239,68,68,0.16), rgba(244,63,94,0.10));
+    color: var(--d-text);
+  }
+
+  .admin-table input, .admin-table select {
+    font-weight: 700;
+  }
+
+  .admin-table .status-select {
+    border-radius: 999px;
+    padding: .55rem .8rem;
+  }
+
+  .orders-toolbar {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .orders-toolbar .filter-box {
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .orders-export {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .orders-export .ghost-btn {
+    padding: 10px 14px;
+    min-width: 128px;
   }
 
   .table-wrap {
@@ -1416,13 +1662,42 @@
       </div>
     </div>
 
-    <button class="nav-button @(activeSection == AdminSection.Products ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Products)">Products</button>
-    <button class="nav-button @(activeSection == AdminSection.Orders ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Orders)">Orders</button>
-    <button class="nav-button @(activeSection == AdminSection.Customers ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Customers)">Customers</button>
-    <button class="nav-button @(activeSection == AdminSection.Faq ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Faq)">FAQ</button>
-    <button class="nav-button @(activeSection == AdminSection.Notifications ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Notifications)">Notifications</button>
-    <button class="nav-button @(activeSection == AdminSection.Contact ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Contact)">Contact</button>
-    <button class="nav-button @(activeSection == AdminSection.Support ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Support)">Support</button>
+    @if (CanAccess(AdminSection.Products))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Products ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Products)">Products</button>
+    }
+    @if (CanAccess(AdminSection.ActivePlans))
+    {
+      <button class="nav-button @(activeSection == AdminSection.ActivePlans ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.ActivePlans)">Active Plans</button>
+    }
+    @if (CanAccess(AdminSection.Orders))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Orders ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Orders)">Orders</button>
+    }
+    @if (CanAccess(AdminSection.Customers))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Customers ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Customers)">Customers</button>
+    }
+    @if (CanAccess(AdminSection.Admins))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Admins ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Admins)">Admins</button>
+    }
+    @if (CanAccess(AdminSection.Faq))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Faq ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Faq)">FAQ</button>
+    }
+    @if (CanAccess(AdminSection.Notifications))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Notifications ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Notifications)">Notifications</button>
+    }
+    @if (CanAccess(AdminSection.Contact))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Contact ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Contact)">Contact</button>
+    }
+    @if (CanAccess(AdminSection.Support))
+    {
+      <button class="nav-button @(activeSection == AdminSection.Support ? "active" : null)" type="button" @onclick="() => NavigateToSection(AdminSection.Support)">Support</button>
+    }
 
     <div class="sidebar-card">
       <h3>@SidebarTitle</h3>
@@ -1446,54 +1721,85 @@
     </header>
 
     <section class="cards">
+      @if (CanAccess(AdminSection.Products))
+      {
       <div class="stat-card @(activeSection == AdminSection.Products ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Products)">
         <div class="stat-icon">P</div>
         <h3>Products</h3>
         <p>Create plans, click any product to edit it, and keep the catalog scrollable on the right.</p>
         <div class="stat-number">@productCount</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Orders))
+      {
       <div class="stat-card @(activeSection == AdminSection.Orders ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Orders)">
         <div class="stat-icon">O</div>
         <h3>Orders</h3>
         <p>Filter orders, scroll the table, and update statuses without losing position.</p>
         <div class="stat-number">@orderCount</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Customers))
+      {
       <div class="stat-card @(activeSection == AdminSection.Customers ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Customers)">
         <div class="stat-icon">C</div>
         <h3>Customers</h3>
         <p>Load the users table and inspect account activity in one place.</p>
         <div class="stat-number">@customerCount</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Admins))
+      {
+      <div class="stat-card @(activeSection == AdminSection.Admins ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Admins)">
+        <div class="stat-icon">A</div>
+        <h3>Admins</h3>
+        <p>Create, update, reset, or remove admin accounts.</p>
+        <div class="stat-number">@adminCount</div>
+      </div>
+      }
+
+      @if (CanAccess(AdminSection.Faq))
+      {
       <div class="stat-card @(activeSection == AdminSection.Faq ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Faq)">
         <div class="stat-icon">F</div>
         <h3>FAQ</h3>
         <p>Publish premium question-and-answer content for the public FAQ page.</p>
         <div class="stat-number">@faqCount</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Notifications))
+      {
       <div class="stat-card @(activeSection == AdminSection.Notifications ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Notifications)">
         <div class="stat-icon">N</div>
         <h3>Notifications</h3>
         <p>Follow up with signed-up users who still have no completed purchase.</p>
         <div class="stat-number">@followUpLeads.Count</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Contact))
+      {
       <div class="stat-card @(activeSection == AdminSection.Contact ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Contact)">
         <div class="stat-icon">M</div>
         <h3>Contact</h3>
         <p>Review inbound contact requests and reply directly from the admin inbox.</p>
         <div class="stat-number">@contactCount</div>
       </div>
+      }
 
+      @if (CanAccess(AdminSection.Support))
+      {
       <div class="stat-card @(activeSection == AdminSection.Support ? "active" : null)" @onclick="() => NavigateToSection(AdminSection.Support)">
         <div class="stat-icon">S</div>
         <h3>Support</h3>
         <p>Stay on top of open queries and respond from a focused thread view.</p>
         <div class="stat-number">@supportTrace.Count</div>
       </div>
+      }
     </section>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -1605,6 +1911,19 @@
             </div>
 
             <div class="form-row">
+              <div>
+                <label>Valid From (UTC)</label>
+                <InputDate TValue="DateTime?" @bind-Value="createProduct.ValidFromUtc" />
+                <p class="helper-text">Optional. Leave empty for no start date.</p>
+              </div>
+              <div>
+                <label>Valid To (UTC)</label>
+                <InputDate TValue="DateTime?" @bind-Value="createProduct.ValidToUtc" />
+                <p class="helper-text">Optional. Leave empty for no end date.</p>
+              </div>
+            </div>
+
+            <div class="form-row">
               <label class="toggle-row">
                 <InputCheckbox @bind-Value="createProduct.IsActive" /> Active listing
               </label>
@@ -1682,6 +2001,83 @@
           </div>
         </div>
       }
+      else if (activeSection == AdminSection.ActivePlans)
+      {
+        <div class="panel-header">
+          <div>
+            <h3>Active Plans</h3>
+            <p class="section-intro">Shows completed orders with product validity windows. Recently expired plans (last 30 days) can be reminded by email.</p>
+          </div>
+          <span class="badge">Plan Status</span>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input class="filter-box" style="flex: 1; min-width: 280px;" value="@activePlanFilter" @oninput="OnActivePlanFilterInput" placeholder="Filter by user, email, product, state..." />
+          <button class="submit-btn" type="button" disabled="@(EligibleFilteredPlanOrderIds.Count == 0 || isBulkNotifyingPlans)" @onclick="NotifyAllFilteredPlansAsync">
+            @(isBulkNotifyingPlans ? "Notifying..." : $"Notify All ({EligibleFilteredPlanOrderIds.Count})")
+          </button>
+        </div>
+
+        <div class="table-wrap" id="activeplans-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>User</th>
+                <th>Email</th>
+                <th>Product</th>
+                <th>Ordered</th>
+                <th>Valid From</th>
+                <th>Valid To</th>
+                <th>State</th>
+                <th>Reminder</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (FilteredActivePlans.Count == 0)
+              {
+                <tr>
+                  <td colspan="9">No plans found.</td>
+                </tr>
+              }
+              else
+              {
+                @foreach (var plan in FilteredActivePlans.Take(visibleActivePlans))
+                {
+                  <tr>
+                    <td>ORD-@plan.OrderId</td>
+                    <td>@plan.UserFullName</td>
+                    <td>@plan.UserEmail</td>
+                    <td>@plan.ProductName</td>
+                    <td>@plan.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td>
+                    <td>@(plan.ValidFromUtc.HasValue ? plan.ValidFromUtc.Value.ToLocalTime().ToString("dd MMM yyyy") : "-")</td>
+                    <td>@(plan.ValidToUtc.HasValue ? plan.ValidToUtc.Value.ToLocalTime().ToString("dd MMM yyyy") : "-")</td>
+                    <td>
+                      <span class="status-pill @(plan.PlanState == "Active" ? "success" : plan.PlanState == "Expired" ? "warning" : "neutral")">@plan.PlanState</span>
+                    </td>
+                    <td>
+                      @if (!plan.IsEligibleForReminder)
+                      {
+                        <span class="helper-text">—</span>
+                      }
+                      else
+                      {
+                        <button class="product-action-btn"
+                                type="button"
+                                disabled="@IsPlanReminded(plan.OrderId)"
+                                @onclick="() => SendPlanReminderAsync(plan)">
+                          @(IsPlanReminded(plan.OrderId) ? "Reminded" : (plan.ReminderType == "ExpiringSoon" ? "Notify (Expiring)" : "Notify (Expired)"))
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+          <div id="activeplans-sentinel" style="height:1px;"></div>
+        </div>
+      }
       else if (activeSection == AdminSection.Orders)
       {
         <div class="panel-header">
@@ -1692,9 +2088,58 @@
           <span class="badge">Live Admin Control</span>
         </div>
 
-        <input class="filter-box" @bind="orderFilter" @bind:event="oninput" placeholder="Filter orders by id, product, user, email, or status..." />
+        <div class="panel-header" style="margin-top: 1.25rem;">
+          <div>
+            <h3>Order Pending Verification</h3>
+            <p class="section-intro">These orders are still marked as Pending. Verify payment and mark Completed so the user can access the product.</p>
+          </div>
+          <span class="badge">Pending</span>
+        </div>
 
-        <div class="table-wrap">
+        <div class="lead-list" style="margin-bottom: 1.5rem;">
+          @if (PendingOrdersForVerification.Count == 0)
+          {
+            <p class="empty-note">No pending orders are waiting right now.</p>
+          }
+          else
+          {
+            @foreach (var order in PendingOrdersForVerification)
+            {
+              <div class="lead-card" style="cursor: default;">
+                <div class="lead-card-header">
+                  <div>
+                    <h4>ORD-@order.OrderId — @order.ProductName</h4>
+                    <p>@order.UserFullName (@order.UserEmail)</p>
+                  </div>
+                  <span class="status pending">@NormalizeOrderStatus(order.Status)</span>
+                </div>
+
+                <div class="lead-meta-row">
+                  <span class="lead-meta-chip">@order.PaymentMethod</span>
+                  <span class="lead-meta-chip">@adminCurrency.FormatFromUsd(order.TotalAmount)</span>
+                  <span class="lead-meta-chip">@order.OrderedAtUtc.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</span>
+                </div>
+
+                <div class="button-row" style="margin-top: .75rem;">
+                  <button class="submit-btn" type="button" disabled="@(savingOrderIds.Contains(order.OrderId))" @onclick="() => MarkOrderCompletedAsync(order)">
+                    @(savingOrderIds.Contains(order.OrderId) ? "Saving..." : "Mark Completed")
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+
+        <div class="orders-toolbar">
+          <input class="filter-box" value="@orderFilter" @oninput="OnOrderFilterInput" placeholder="Filter orders by id, product, user, email, or status..." />
+          <div class="orders-export">
+            <button class="ghost-btn" type="button" @onclick="ExportOrdersCsvAsync">Export Excel</button>
+            <button class="ghost-btn" type="button" @onclick="ExportOrdersPdfAsync">Export PDF</button>
+            <button class="ghost-btn" type="button" @onclick="ExportOrdersHtmlAsync">Export HTML</button>
+          </div>
+        </div>
+
+        <div class="table-wrap" id="orders-scroll">
           <table>
             <thead>
               <tr>
@@ -1717,7 +2162,7 @@
               }
               else
               {
-                @foreach (var row in FilteredOrders)
+                @foreach (var row in FilteredOrders.Take(visibleOrders))
                 {
                   <tr>
                     <td><strong>ORD-@row.OrderId</strong></td>
@@ -1745,6 +2190,7 @@
               }
             </tbody>
           </table>
+          <div id="orders-sentinel" style="height:1px;"></div>
         </div>
       }
       else if (activeSection == AdminSection.Customers)
@@ -1757,9 +2203,9 @@
           <span class="badge">User Accounts</span>
         </div>
 
-        <input class="filter-box" @bind="customerFilter" @bind:event="oninput" placeholder="Filter customers by name, email, phone, role, or status..." />
+        <input class="filter-box" value="@customerFilter" @oninput="OnCustomerFilterInput" placeholder="Filter customers by name, email, phone, role, or status..." />
 
-        <div class="table-wrap">
+        <div class="table-wrap" id="customers-scroll">
           <table>
             <thead>
               <tr>
@@ -1780,7 +2226,7 @@
               }
               else
               {
-                @foreach (var customer in FilteredCustomers)
+                @foreach (var customer in FilteredCustomers.Take(visibleCustomers))
                 {
                   <tr>
                     <td>
@@ -1806,6 +2252,191 @@
                     </td>
                     <td>@customer.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
                     <td>@(customer.LastLoginAtUtc.HasValue ? customer.LastLoginAtUtc.Value.ToLocalTime().ToString("dd MMM yyyy hh:mm tt") : "Never")</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+          <div id="customers-sentinel" style="height:1px;"></div>
+        </div>
+      }
+      else if (activeSection == AdminSection.Admins)
+      {
+        <div class="panel-header">
+          <div>
+            <h3>Admin Accounts</h3>
+            <p class="section-intro">Add admins, edit details, reset passwords, and delete admin accounts.</p>
+          </div>
+          <span class="badge">Admins</span>
+        </div>
+
+        <EditForm class="form-grid admin-form-card" Model="createAdminRequest" OnValidSubmit="CreateAdminAsync">
+          <DataAnnotationsValidator />
+          <div class="admin-grid-2">
+            <div>
+              <label>Full Name</label>
+              <InputText class="admin-input" @bind-Value="createAdminRequest.FullName" placeholder="Admin name" />
+            </div>
+            <div>
+              <label>Email</label>
+              <InputText class="admin-input" @bind-Value="createAdminRequest.Email" placeholder="admin@kohinoorea.com" />
+            </div>
+            <div>
+              <label>Phone</label>
+              <InputText class="admin-input" @bind-Value="createAdminRequest.Phone" placeholder="Optional phone" />
+            </div>
+            <div>
+              <label>Temp Password</label>
+              <InputText class="admin-input" @bind-Value="createAdminRequest.Password" placeholder="Set a temp password" type="password" />
+            </div>
+          </div>
+          <div>
+            <label>Admin Access</label>
+            <div class="role-toggle-bar">
+              <div class="role-toggle-actions">
+                <button class="role-chip @(IsAllRolesSelected(createAdminRoles) ? "selected" : null)" type="button" @onclick="SelectAllAdminRoles">
+                  <span class="dot"></span> Full Access
+                </button>
+                <button class="role-chip @(!IsAnyRoleSelected(createAdminRoles) ? "selected" : null)" type="button" @onclick="ClearAdminRoles">
+                  <span class="dot"></span> None
+                </button>
+                <button class="role-chip @(IsSupportOnly(createAdminRoles) ? "selected" : null)" type="button" @onclick="SelectSupportOnly">
+                  <span class="dot"></span> Support Only
+                </button>
+                <button class="role-chip @(IsOrdersOnly(createAdminRoles) ? "selected" : null)" type="button" @onclick="SelectOrdersOnly">
+                  <span class="dot"></span> Orders Only
+                </button>
+              </div>
+              <div class="role-toggle-actions">
+                <span class="helper-text">Tap modules to grant access.</span>
+              </div>
+            </div>
+
+            <div class="role-grid">
+              <div class="role-tile @(createAdminRoles.Products ? "selected" : null)" @onclick="ToggleProductsRole">
+                <div>
+                  <strong>Products</strong>
+                  <small>Create and edit plans</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Products ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Orders ? "selected" : null)" @onclick="ToggleOrdersRole">
+                <div>
+                  <strong>Orders</strong>
+                  <small>Verify and complete orders</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Orders ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Customers ? "selected" : null)" @onclick="ToggleCustomersRole">
+                <div>
+                  <strong>Customers</strong>
+                  <small>Manage user accounts</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Customers ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Admins ? "selected" : null)" @onclick="ToggleAdminsRole">
+                <div>
+                  <strong>Admins</strong>
+                  <small>Admin accounts + passwords</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Admins ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Faq ? "selected" : null)" @onclick="ToggleFaqRole">
+                <div>
+                  <strong>FAQ</strong>
+                  <small>Publish FAQ content</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Faq ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Notifications ? "selected" : null)" @onclick="ToggleNotificationsRole">
+                <div>
+                  <strong>Notifications</strong>
+                  <small>Lead follow-ups</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Notifications ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Contact ? "selected" : null)" @onclick="ToggleContactRole">
+                <div>
+                  <strong>Contact</strong>
+                  <small>Inbox + replies</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Contact ? "On" : "Off")</span>
+              </div>
+              <div class="role-tile @(createAdminRoles.Support ? "selected" : null)" @onclick="ToggleSupportRole">
+                <div>
+                  <strong>Support</strong>
+                  <small>Tickets and threads</small>
+                </div>
+                <span class="role-pill">@(createAdminRoles.Support ? "On" : "Off")</span>
+              </div>
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="admin-btn primary" type="submit" disabled="@isSavingAdmin">@(isSavingAdmin ? "Saving..." : "Add Admin")</button>
+          </div>
+        </EditForm>
+
+        <input class="filter-box admin-input" @bind="adminFilter" @bind:event="oninput" placeholder="Filter admins by name, email, phone, or status..." style="margin-top: 1rem;" />
+
+        <div class="table-wrap admin-table" id="admins-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Admin</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (FilteredAdmins.Count == 0)
+              {
+                <tr>
+                  <td colspan="6">No admins match this filter.</td>
+                </tr>
+              }
+              else
+              {
+                @foreach (var admin in FilteredAdmins)
+                {
+                  <tr>
+                    <td>
+                      <InputText class="admin-input" @bind-Value="admin.FullName" />
+                    </td>
+                    <td>@admin.Email</td>
+                    <td>
+                      <InputText class="admin-input" @bind-Value="admin.Phone" />
+                    </td>
+                    <td>
+                      <select class="status-select" value="@(admin.IsActive ? "Active" : "Inactive")" @onchange="e => HandleAdminActiveChange(admin.Id, e.Value?.ToString())">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </td>
+                    <td>@admin.CreatedAtUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
+                    <td>
+                      <div class="admin-actions">
+                        <button class="admin-btn primary" type="button" disabled="@savingAdminIds.Contains(admin.Id)" @onclick="() => SaveAdminAsync(admin)">
+                          @(savingAdminIds.Contains(admin.Id) ? "Saving..." : "Save")
+                        </button>
+                        <button class="admin-btn" type="button" disabled="@savingAdminIds.Contains(admin.Id)" @onclick="() => StartResetAdminPassword(admin.Id)">
+                          Reset Password
+                        </button>
+                        <button class="admin-btn danger" type="button" disabled="@savingAdminIds.Contains(admin.Id)" @onclick="() => DeleteAdminAsync(admin.Id)">
+                          Delete
+                        </button>
+                      </div>
+                      @if (adminIdResettingPassword == admin.Id)
+                      {
+                        <div style="margin-top:.5rem; display:flex; gap:.5rem; align-items:center;">
+                          <input class="admin-input" style="max-width:260px;" @bind="adminNewPassword" @bind:event="oninput" placeholder="New password" type="password" />
+                          <button class="admin-btn primary" type="button" disabled="@savingAdminIds.Contains(admin.Id)" @onclick="() => ResetAdminPasswordAsync(admin.Id)">Save</button>
+                          <button class="admin-btn" type="button" @onclick="CancelResetAdminPassword">Cancel</button>
+                        </div>
+                      }
+                    </td>
                   </tr>
                 }
               }
@@ -1856,6 +2487,7 @@
                       <button class="ghost-btn" type="button" @onclick="() => ToggleFaqActiveAsync(faq)">
                         @(faq.IsActive ? "Hide" : "Show")
                       </button>
+                      <button class="ghost-btn force" type="button" @onclick="() => DeleteFaqAsync(faq)">Delete</button>
                     </div>
                   </div>
                 }
@@ -2100,6 +2732,7 @@
               <div class="button-row">
                 <button class="submit-btn" type="submit" disabled="@(!CanSendContactReply)">@(isSendingContactReply ? "Sending..." : "Send Reply Email")</button>
                 <button class="ghost-btn" type="button" disabled="@(SelectedContactMessage is null)" @onclick="ResetContactReplyDraft">Reset Draft</button>
+                <button class="ghost-btn force" type="button" disabled="@(SelectedContactMessage is null)" @onclick="DeleteSelectedContactMessageAsync">Delete</button>
               </div>
             }
           </EditForm>
@@ -2119,7 +2752,7 @@
           </div>
         </div>
 
-        <div class="support-layout @(isSupportMaximized ? "maximized" : null)">
+        <div class="support-layout @(isSupportMaximized ? "maximized" : null)" id="support-scroll">
           <div class="query-list">
             @if (supportTrace.Count == 0)
             {
@@ -2127,7 +2760,7 @@
             }
             else
             {
-              @foreach (var query in supportTrace.OrderByDescending(item => item.CreatedAtUtc))
+              @foreach (var query in FilteredSupportQueries.Take(visibleSupport))
               {
                 <div class="query-card @(expandedSupportQueryId == query.Id ? "active" : null)">
                   <h4>@query.Subject</h4>
@@ -2141,6 +2774,7 @@
                   </div>
                 </div>
               }
+              <div id="support-sentinel" style="height:1px;"></div>
             }
           </div>
 
@@ -2220,8 +2854,10 @@ else
     private enum AdminSection
     {
         Products,
+        ActivePlans,
         Orders,
         Customers,
+        Admins,
         Faq,
         Notifications,
         Contact,
@@ -2247,11 +2883,27 @@ else
     private readonly List<SupportQueryDto> supportTrace = new();
     private readonly List<SupportQueryMessageDto> expandedSupportMessages = new();
     private readonly List<AdminUserDto> customers = new();
+    private readonly List<AdminUserDto> admins = new();
     private readonly List<AdminLeadNotificationDto> followUpLeads = new();
+    private readonly List<ActivePlanDto> activePlans = new();
     private readonly List<ToastMessage> toasts = new();
     private readonly Dictionary<long, string> pendingOrderStatuses = new();
     private readonly HashSet<long> savingOrderIds = new();
+    private readonly HashSet<long> remindedPlanOrderIds = new();
+
+    private const int PageSize = 10;
+    private int visibleOrders = PageSize;
+    private int visibleCustomers = PageSize;
+    private int visibleActivePlans = PageSize;
+    private int visibleSupport = PageSize;
+
+    private IJSObjectReference? infiniteScrollModule;
+    private IJSObjectReference? infiniteScrollHandle;
+    private DotNetObjectReference<AdminDashboard>? infiniteScrollDotNetRef;
+    private IJSObjectReference? exportModule;
+
     private readonly HashSet<long> savingCustomerIds = new();
+    private readonly HashSet<long> savingAdminIds = new();
     private readonly Dictionary<long, DateTime> notifiedProductUntilUtc = new();
     private readonly List<string> descriptionSummaryInputs = new();
     private readonly List<string> descriptionFeatureInputs = new();
@@ -2260,13 +2912,30 @@ else
     private CreateSupportQueryMessageRequest adminReplyRequest = new();
     private SendLeadFollowUpEmailRequest followUpEmailRequest = new();
     private SendContactReplyRequest contactReplyRequest = new();
+    private CreateAdminRequest createAdminRequest = new();
+    private sealed class AdminRoleSelection
+    {
+        public bool Products { get; set; } = true;
+        public bool Orders { get; set; } = true;
+        public bool Customers { get; set; } = true;
+        public bool Admins { get; set; } = false;
+        public bool Faq { get; set; } = true;
+        public bool Notifications { get; set; } = true;
+        public bool Contact { get; set; } = true;
+        public bool Support { get; set; } = true;
+    }
+
+    private AdminRoleSelection createAdminRoles = new();
     private AdminSection activeSection = AdminSection.Products;
     private string? statusMessage;
     private string profileEmail = string.Empty;
     private string? pendingScrollAnchor;
     private string productFilter = string.Empty;
     private string orderFilter = string.Empty;
+    private string activePlanFilter = string.Empty;
+    private bool isBulkNotifyingPlans;
     private string customerFilter = string.Empty;
+    private string adminFilter = string.Empty;
     private string faqFilter = string.Empty;
     private string followUpLeadFilter = string.Empty;
     private string contactFilter = string.Empty;
@@ -2274,6 +2943,7 @@ else
     private int productCount;
     private int orderCount;
     private int customerCount;
+    private int adminCount;
     private int faqCount;
     private int contactCount;
     private decimal totalRevenue;
@@ -2285,6 +2955,9 @@ else
     private bool isSendingFollowUpEmail;
     private bool isSendingContactReply;
     private bool isUpdatingSupportTicketStatus;
+    private bool isSavingAdmin;
+    private long? adminIdResettingPassword;
+    private string adminNewPassword = string.Empty;
     private long? expandedSupportQueryId;
     private IJSObjectReference? supportRealtimeModule;
     private IJSObjectReference? supportRealtimeInstance;
@@ -2317,8 +2990,10 @@ else
     private string PageTitle => activeSection switch
     {
         AdminSection.Products => "Product Management",
+        AdminSection.ActivePlans => "Active Plans",
         AdminSection.Orders => "Order Control Center",
         AdminSection.Customers => "Customer Accounts",
+        AdminSection.Admins => "Admin Accounts",
         AdminSection.Faq => "FAQ Publishing",
         AdminSection.Notifications => "Notification Center",
         AdminSection.Contact => "Contact Inbox",
@@ -2328,8 +3003,10 @@ else
     private string SidebarTitle => activeSection switch
     {
         AdminSection.Products => editingProductId.HasValue ? "Editing Product" : "Publishing Tools",
+        AdminSection.ActivePlans => "Plan Monitoring",
         AdminSection.Orders => "Order Workflow",
         AdminSection.Customers => "Customer Directory",
+        AdminSection.Admins => "Admin Security",
         AdminSection.Faq => editingFaqId.HasValue ? "Editing FAQ" : "FAQ Publisher",
         AdminSection.Notifications => "Lead Follow-up",
         AdminSection.Contact => "Message Replies",
@@ -2339,8 +3016,10 @@ else
     private string SidebarMessage => activeSection switch
     {
         AdminSection.Products => editingProductId.HasValue ? "You are editing a product. Update it from the left form and the catalog stays scrollable on the right." : "Create product cards that flow into pricing, dashboard, and cart surfaces with the same content model.",
+        AdminSection.ActivePlans => "See completed orders with plan validity windows and send friendly reminders for recently expired plans.",
         AdminSection.Orders => "Filter orders and keep saving statuses without losing scroll position.",
         AdminSection.Customers => "Review the admin users table with creation dates, roles, and last login activity.",
+        AdminSection.Admins => "Add admins, reset passwords, and keep access under control.",
         AdminSection.Faq => editingFaqId.HasValue ? "Update the selected FAQ answer or visibility and publish changes back to the public page." : "Create premium FAQ content with clean ordering and visibility control for the public site.",
         AdminSection.Notifications => "Select users with no completed purchase yet, personalize the draft, and send a follow-up email without leaving the dashboard.",
         AdminSection.Contact => "Review inbound contact requests, inspect the original message, and reply through the same SMTP delivery flow used for OTP mail.",
@@ -2357,8 +3036,34 @@ else
         .OrderByDescending(item => item.OrderedAtUtc)
         .ToList();
 
+    private List<OrderTraceDto> PendingOrdersForVerification => orderTrace
+        .Where(order => string.Equals(NormalizeOrderStatus(order.Status), "Pending", StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(item => item.OrderedAtUtc)
+        .Take(25)
+        .ToList();
+
+    private List<ActivePlanDto> FilteredActivePlans => activePlans
+        .Where(plan => MatchesActivePlanFilter(plan))
+        .OrderByDescending(item => item.OrderedAtUtc)
+        .ToList();
+
+    private List<long> EligibleFilteredPlanOrderIds => FilteredActivePlans
+        .Where(p => p.IsEligibleForReminder)
+        .Select(p => p.OrderId)
+        .Distinct()
+        .ToList();
+
     private List<AdminUserDto> FilteredCustomers => customers
         .Where(customer => MatchesCustomerFilter(customer))
+        .OrderByDescending(item => item.CreatedAtUtc)
+        .ToList();
+
+    private List<AdminUserDto> FilteredAdmins => admins
+        .Where(admin => MatchesAdminFilter(admin))
+        .OrderByDescending(item => item.CreatedAtUtc)
+        .ToList();
+
+    private List<SupportQueryDto> FilteredSupportQueries => supportTrace
         .OrderByDescending(item => item.CreatedAtUtc)
         .ToList();
 
@@ -2394,6 +3099,56 @@ else
 
     private bool CanSendContactReply => !isSendingContactReply && SelectedContactMessage is not null;
 
+    private HashSet<string> myRoles = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool HasRole(string role) => myRoles.Contains(role);
+
+    private bool IsFullAdmin => myRoles.Contains(AuthRoles.Admin) && !myRoles.Any(r => r.StartsWith("Admin.", StringComparison.OrdinalIgnoreCase));
+
+    private bool CanAccess(AdminSection section)
+    {
+        if (!myRoles.Contains(AuthRoles.Admin))
+        {
+            return false;
+        }
+
+        if (IsFullAdmin)
+        {
+            return true;
+        }
+
+        return section switch
+        {
+            AdminSection.Products => HasRole(AdminSectionRoles.Products),
+            AdminSection.ActivePlans => HasRole(AdminSectionRoles.Orders),
+            AdminSection.Orders => HasRole(AdminSectionRoles.Orders),
+            AdminSection.Customers => HasRole(AdminSectionRoles.Customers),
+            AdminSection.Admins => HasRole(AdminSectionRoles.Admins),
+            AdminSection.Faq => HasRole(AdminSectionRoles.Faq),
+            AdminSection.Notifications => HasRole(AdminSectionRoles.Notifications),
+            AdminSection.Contact => HasRole(AdminSectionRoles.Contact),
+            AdminSection.Support => HasRole(AdminSectionRoles.Support),
+            _ => false
+        };
+    }
+
+    private AdminSection GetDefaultAllowedSection()
+    {
+        var ordered = new[]
+        {
+            AdminSection.Products,
+            AdminSection.Orders,
+            AdminSection.Customers,
+            AdminSection.Admins,
+            AdminSection.Faq,
+            AdminSection.Notifications,
+            AdminSection.Contact,
+            AdminSection.Support
+        };
+
+        return ordered.FirstOrDefault(CanAccess);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += HandleLocationChanged;
@@ -2406,13 +3161,20 @@ else
         }
 
         var me = await meResponse.Content.ReadFromJsonAsync<AuthResponse>();
-        if (!string.Equals(me?.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase))
+        if (me is null || !string.Equals(me.Role, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase))
         {
             Navigation.NavigateTo("/dashboard", true);
             return;
         }
 
         profileEmail = me?.Email ?? string.Empty;
+        myRoles = new HashSet<string>(me.Roles ?? new List<string> { AuthRoles.Admin }, StringComparer.OrdinalIgnoreCase);
+
+        if (!CanAccess(activeSection))
+        {
+            activeSection = GetDefaultAllowedSection();
+        }
+
         await LoadDashboardDataAsync();
         ApplySectionFromUri(Navigation.Uri, shouldQueueScroll: true);
         canRenderDashboard = true;
@@ -2428,6 +3190,7 @@ else
         }
 
         await base.OnAfterRenderAsync(firstRender);
+        await EnsureInfiniteScrollAsync();
     }
 
     public void Dispose()
@@ -2440,6 +3203,8 @@ else
         activeSection = section;
         pendingScrollAnchor = GetSectionHash(section);
         Navigation.NavigateTo($"/admin-dashboard#{GetSectionHash(section)}", replace: true);
+
+        ResetPagingForSection(section);
     }
 
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
@@ -2453,8 +3218,10 @@ else
         var fragment = Navigation.ToAbsoluteUri(uri).Fragment.TrimStart('#').ToLowerInvariant();
         var section = fragment switch
         {
+            "active-plans" => AdminSection.ActivePlans,
             "orders" => AdminSection.Orders,
             "customers" => AdminSection.Customers,
+            "admins" => AdminSection.Admins,
             "faq" => AdminSection.Faq,
             "notifications" => AdminSection.Notifications,
             "contact" => AdminSection.Contact,
@@ -2463,9 +3230,34 @@ else
         };
 
         activeSection = section;
+        if (!CanAccess(activeSection))
+        {
+            activeSection = GetDefaultAllowedSection();
+        }
         if (shouldQueueScroll)
         {
-            pendingScrollAnchor = GetSectionHash(section);
+            pendingScrollAnchor = GetSectionHash(activeSection);
+        }
+
+        ResetPagingForSection(activeSection);
+    }
+
+    private void ResetPagingForSection(AdminSection section)
+    {
+        switch (section)
+        {
+            case AdminSection.Orders:
+                visibleOrders = PageSize;
+                break;
+            case AdminSection.Customers:
+                visibleCustomers = PageSize;
+                break;
+            case AdminSection.ActivePlans:
+                visibleActivePlans = PageSize;
+                break;
+            case AdminSection.Support:
+                visibleSupport = PageSize;
+                break;
         }
     }
 
@@ -2473,8 +3265,10 @@ else
     {
         return section switch
         {
+            AdminSection.ActivePlans => "active-plans",
             AdminSection.Orders => "orders",
             AdminSection.Customers => "customers",
+            AdminSection.Admins => "admins",
             AdminSection.Faq => "faq",
             AdminSection.Notifications => "notifications",
             AdminSection.Contact => "contact",
@@ -2487,22 +3281,26 @@ else
     {
         statusMessage = null;
 
-        var ordersTask = Http.GetAsync("api/commerce/orders/trace");
-        var productsTask = Http.GetAsync("api/commerce/products?all=true");
-        var faqsTask = Http.GetAsync("api/commerce/faqs/admin");
-        var contactsTask = Http.GetAsync("api/commerce/contact-messages");
-        var supportTask = Http.GetAsync("api/commerce/support/trace");
-        var customersTask = Http.GetAsync("api/auth/users");
-        var followUpLeadsTask = Http.GetAsync("api/auth/follow-up-leads");
+        var ordersTask = CanAccess(AdminSection.Orders) ? Http.GetAsync("api/commerce/orders/trace") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var productsTask = CanAccess(AdminSection.Products) ? Http.GetAsync("api/commerce/products?all=true") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var activePlansTask = CanAccess(AdminSection.ActivePlans) ? Http.GetAsync("api/commerce/active-plans") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var faqsTask = CanAccess(AdminSection.Faq) ? Http.GetAsync("api/commerce/faqs/admin") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var contactsTask = CanAccess(AdminSection.Contact) ? Http.GetAsync("api/commerce/contact-messages") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var supportTask = CanAccess(AdminSection.Support) ? Http.GetAsync("api/commerce/support/trace") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var customersTask = CanAccess(AdminSection.Customers) ? Http.GetAsync("api/auth/users") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var adminsTask = CanAccess(AdminSection.Admins) ? Http.GetAsync("api/auth/admins") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
+        var followUpLeadsTask = CanAccess(AdminSection.Notifications) ? Http.GetAsync("api/auth/follow-up-leads") : Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden));
 
-        await Task.WhenAll(ordersTask, productsTask, faqsTask, contactsTask, supportTask, customersTask, followUpLeadsTask);
+        await Task.WhenAll(ordersTask, productsTask, activePlansTask, faqsTask, contactsTask, supportTask, customersTask, adminsTask, followUpLeadsTask);
 
         var ordersResponse = await ordersTask;
         var productsResponse = await productsTask;
+        var activePlansResponse = await activePlansTask;
         var faqsResponse = await faqsTask;
         var contactsResponse = await contactsTask;
         var supportResponse = await supportTask;
         var customersResponse = await customersTask;
+        var adminsResponse = await adminsTask;
         var followUpLeadsResponse = await followUpLeadsTask;
 
         orderTrace.Clear();
@@ -2517,6 +3315,13 @@ else
         {
             var payload = await productsResponse.Content.ReadFromJsonAsync<List<ProductDto>>();
             products.AddRange(payload ?? Enumerable.Empty<ProductDto>());
+        }
+
+        activePlans.Clear();
+        if (activePlansResponse.IsSuccessStatusCode)
+        {
+            var payload = await activePlansResponse.Content.ReadFromJsonAsync<List<ActivePlanDto>>();
+            activePlans.AddRange(payload ?? Enumerable.Empty<ActivePlanDto>());
         }
 
         faqs.Clear();
@@ -2545,6 +3350,13 @@ else
         {
             var payload = await customersResponse.Content.ReadFromJsonAsync<List<AdminUserDto>>();
             customers.AddRange(payload ?? Enumerable.Empty<AdminUserDto>());
+        }
+
+        admins.Clear();
+        if (adminsResponse.IsSuccessStatusCode)
+        {
+            var payload = await adminsResponse.Content.ReadFromJsonAsync<List<AdminUserDto>>();
+            admins.AddRange(payload ?? Enumerable.Empty<AdminUserDto>());
         }
 
         followUpLeads.Clear();
@@ -2585,9 +3397,209 @@ else
         productCount = products.Count;
         orderCount = orderTrace.Count;
         customerCount = customers.Count;
+        adminCount = admins.Count;
         faqCount = faqs.Count;
         contactCount = contactMessages.Count;
         totalRevenue = orderTrace.Sum(x => x.TotalAmount);
+    }
+
+    private async Task EnsureInfiniteScrollAsync()
+    {
+        try
+        {
+            infiniteScrollModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/admin-infinite-scroll.js");
+            infiniteScrollDotNetRef ??= DotNetObjectReference.Create(this);
+
+            // Always disconnect previous observer and attach for the current section.
+            if (infiniteScrollHandle is not null)
+            {
+                try { await infiniteScrollHandle.InvokeVoidAsync("disconnect"); } catch { }
+                try { await infiniteScrollHandle.DisposeAsync(); } catch { }
+                infiniteScrollHandle = null;
+            }
+
+            var sentinelId = activeSection switch
+            {
+                AdminSection.Orders => "orders-sentinel",
+                AdminSection.Customers => "customers-sentinel",
+                AdminSection.ActivePlans => "activeplans-sentinel",
+                AdminSection.Support => "support-sentinel",
+                _ => null
+            };
+
+            if (string.IsNullOrWhiteSpace(sentinelId))
+            {
+                return;
+            }
+
+            // JS returns null if sentinel not in DOM yet.
+            infiniteScrollHandle = await infiniteScrollModule!.InvokeAsync<IJSObjectReference?>(
+                "observeSentinel",
+                infiniteScrollDotNetRef,
+                sentinelId,
+                "OnInfiniteScrollHit");
+        }
+        catch
+        {
+        }
+    }
+
+    [JSInvokable]
+    public Task OnInfiniteScrollHit()
+    {
+        switch (activeSection)
+        {
+            case AdminSection.Orders:
+                visibleOrders = Math.Min(FilteredOrders.Count, visibleOrders + PageSize);
+                break;
+            case AdminSection.Customers:
+                visibleCustomers = Math.Min(FilteredCustomers.Count, visibleCustomers + PageSize);
+                break;
+            case AdminSection.ActivePlans:
+                visibleActivePlans = Math.Min(FilteredActivePlans.Count, visibleActivePlans + PageSize);
+                break;
+            case AdminSection.Support:
+                visibleSupport = Math.Min(FilteredSupportQueries.Count, visibleSupport + PageSize);
+                break;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ExportOrdersCsvAsync()
+    {
+        var items = FilteredOrders;
+        var csv = BuildOrdersCsv(items);
+        exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/admin-export.js");
+        await exportModule.InvokeVoidAsync("downloadTextFile", $"orders-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv", csv, "text/csv;charset=utf-8");
+    }
+
+    private async Task ExportOrdersHtmlAsync()
+    {
+        var items = FilteredOrders;
+        var html = BuildOrdersHtml(items, forPrint: false);
+        exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/admin-export.js");
+        await exportModule.InvokeVoidAsync("downloadTextFile", $"orders-{DateTime.UtcNow:yyyyMMdd-HHmm}.html", html, "text/html;charset=utf-8");
+    }
+
+    private async Task ExportOrdersPdfAsync()
+    {
+        var qs = string.IsNullOrWhiteSpace(orderFilter)
+            ? string.Empty
+            : $"?q={Uri.EscapeDataString(orderFilter.Trim())}";
+
+        var response = await Http.GetAsync($"api/commerce/orders/trace/export/pdf{qs}");
+        if (!response.IsSuccessStatusCode)
+        {
+            _ = ShowToastAsync("Failed to export PDF.", isError: true);
+            return;
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        exportModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./assets/js/admin-export.js");
+        await exportModule.InvokeVoidAsync("downloadBytesFile", $"orders-{DateTime.UtcNow:yyyyMMdd-HHmm}.pdf", bytes, "application/pdf");
+    }
+
+    private string BuildOrdersCsv(IEnumerable<OrderTraceDto> items)
+    {
+        static string Csv(string? value)
+        {
+            var v = value ?? string.Empty;
+            v = v.Replace("\r", " ").Replace("\n", " ").Trim();
+            if (v.Contains('"'))
+            {
+                v = v.Replace("\"", "\"\"");
+            }
+
+            var mustQuote = v.Contains(',') || v.Contains('"');
+            return mustQuote ? $"\"{v}\"" : v;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Order,Product,User,Email,Qty,Total,OrderedUtc,Status,Filter");
+
+        var filter = string.IsNullOrWhiteSpace(orderFilter) ? "none" : orderFilter.Trim();
+        foreach (var row in items)
+        {
+            sb.Append(Csv($"ORD-{row.OrderId}")).Append(',')
+              .Append(Csv(row.ProductName)).Append(',')
+              .Append(Csv(row.UserFullName)).Append(',')
+              .Append(Csv(row.UserEmail)).Append(',')
+              .Append(Csv(row.Quantity.ToString())).Append(',')
+              .Append(Csv(row.TotalAmount.ToString(System.Globalization.CultureInfo.InvariantCulture))).Append(',')
+              .Append(Csv(row.OrderedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"))).Append(',')
+              .Append(Csv(NormalizeOrderStatus(row.Status))).Append(',')
+              .AppendLine(Csv(filter));
+        }
+
+        return sb.ToString();
+    }
+
+    private string BuildOrdersHtml(IEnumerable<OrderTraceDto> items, bool forPrint)
+    {
+        static string Html(string? raw) => System.Net.WebUtility.HtmlEncode(raw ?? string.Empty);
+        var filter = string.IsNullOrWhiteSpace(orderFilter) ? "No filter" : orderFilter.Trim();
+        var generated = DateTime.UtcNow.ToString("dd MMM yyyy HH:mm 'UTC'");
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("<!doctype html>");
+        sb.AppendLine("<html><head><meta charset=\"utf-8\" />");
+        sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />");
+        sb.AppendLine("<title>Kohinoor EA - Orders Export</title>");
+        sb.AppendLine("<style>");
+        sb.AppendLine("body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px;color:#0f172a}");
+        sb.AppendLine(".wrap{max-width:1100px;margin:0 auto}");
+        sb.AppendLine(".title{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}");
+        sb.AppendLine("h1{font-size:22px;margin:0}");
+        sb.AppendLine(".meta{color:#475569;font-size:12px}");
+        sb.AppendLine(".pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #e2e8f0;border-radius:999px;padding:6px 10px;background:#f8fafc;font-size:12px;color:#334155}");
+        sb.AppendLine("table{width:100%;border-collapse:collapse;margin-top:14px}");
+        sb.AppendLine("th,td{border-bottom:1px solid #e2e8f0;padding:10px 10px;text-align:left;font-size:12px;vertical-align:top}");
+        sb.AppendLine("th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b}");
+        sb.AppendLine(".right{text-align:right}");
+        sb.AppendLine(".status{font-weight:700}");
+        if (forPrint)
+        {
+            sb.AppendLine("@media print{body{margin:0} .pill{border-color:#cbd5e1}}");
+        }
+        sb.AppendLine("</style></head><body><div class=\"wrap\">");
+
+        sb.AppendLine("<div class=\"title\">");
+        sb.AppendLine("<div>");
+        sb.AppendLine("<h1>Kohinoor EA - Orders Export</h1>");
+        sb.AppendLine($"<div class=\"meta\">Generated: {Html(generated)} • Items: {items.Count()}</div>");
+        sb.AppendLine("</div>");
+        sb.AppendLine($"<div class=\"pill\">Filter: <strong>{Html(filter)}</strong></div>");
+        sb.AppendLine("</div>");
+
+        sb.AppendLine("<table><thead><tr>");
+        sb.AppendLine("<th>Order</th><th>Product</th><th>User</th><th>Email</th><th class=\"right\">Qty</th><th class=\"right\">Total (USD)</th><th>Ordered (UTC)</th><th>Status</th>");
+        sb.AppendLine("</tr></thead><tbody>");
+
+        foreach (var row in items)
+        {
+            sb.AppendLine("<tr>");
+            sb.AppendLine($"<td><strong>ORD-{row.OrderId}</strong></td>");
+            sb.AppendLine($"<td>{Html(row.ProductName)}</td>");
+            sb.AppendLine($"<td>{Html(row.UserFullName)}</td>");
+            sb.AppendLine($"<td>{Html(row.UserEmail)}</td>");
+            sb.AppendLine($"<td class=\"right\">{row.Quantity}</td>");
+            sb.AppendLine($"<td class=\"right\">{row.TotalAmount:0.00}</td>");
+            var orderedUtc = row.OrderedAtUtc.ToString("dd MMM yyyy HH:mm");
+            sb.AppendLine($"<td>{Html(orderedUtc)}</td>");
+            sb.AppendLine($"<td class=\"status\">{Html(NormalizeOrderStatus(row.Status))}</td>");
+            sb.AppendLine("</tr>");
+        }
+
+        if (!items.Any())
+        {
+            sb.AppendLine("<tr><td colspan=\"8\" class=\"meta\">No orders match this filter.</td></tr>");
+        }
+
+        sb.AppendLine("</tbody></table>");
+        sb.AppendLine("<div class=\"meta\" style=\"margin-top:14px\">Tip: For Excel, import the CSV export. For PDF, use the browser Save as PDF in the print dialog.</div>");
+        sb.AppendLine("</div></body></html>");
+        return sb.ToString();
     }
 
     private async Task SaveProductAsync()
@@ -2699,7 +3711,9 @@ else
             Price = product.Price,
             IsActive = product.IsActive,
             IsMaster = product.IsMaster,
-            CountryCode = product.CountryCode
+            CountryCode = product.CountryCode,
+            ValidFromUtc = product.ValidFromUtc,
+            ValidToUtc = product.ValidToUtc
         };
 
           PopulateDescriptionFields(product.Description);
@@ -2787,6 +3801,26 @@ else
         }
 
         statusMessage = nextActive ? "FAQ is now visible on the public page." : "FAQ hidden from the public page.";
+        _ = ShowToastAsync(statusMessage);
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task DeleteFaqAsync(FaqDto faq)
+    {
+        var response = await Http.DeleteAsync($"api/commerce/faqs/{faq.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            statusMessage = "Failed to delete FAQ.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            return;
+        }
+
+        if (editingFaqId == faq.Id)
+        {
+            ResetFaqForm();
+        }
+
+        statusMessage = "FAQ deleted.";
         _ = ShowToastAsync(statusMessage);
         await LoadDashboardDataAsync();
     }
@@ -2982,6 +4016,236 @@ else
         _ = ShowToastAsync($"Order #{row.OrderId} marked as {nextStatus}.");
     }
 
+    private Task MarkOrderCompletedAsync(OrderTraceDto row)
+    {
+        pendingOrderStatuses[row.OrderId] = "Completed";
+        return SaveOrderStatusAsync(row);
+    }
+
+    private void HandleAdminActiveChange(long adminId, string? value)
+    {
+        var admin = admins.FirstOrDefault(a => a.Id == adminId);
+        if (admin is null)
+        {
+            return;
+        }
+
+        admin.IsActive = string.Equals(value, "Active", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task CreateAdminAsync()
+    {
+        if (isSavingAdmin)
+        {
+            return;
+        }
+
+        isSavingAdmin = true;
+        try
+        {
+            createAdminRequest.Roles = BuildSelectedAdminRoles(createAdminRoles);
+            var response = await Http.PostAsJsonAsync("api/auth/admins", createAdminRequest);
+            if (!response.IsSuccessStatusCode)
+            {
+                _ = ShowToastAsync("Failed to create admin.", isError: true);
+                return;
+            }
+
+            createAdminRequest = new CreateAdminRequest();
+            createAdminRoles = new AdminRoleSelection();
+            await LoadDashboardDataAsync();
+            _ = ShowToastAsync("Admin created.");
+        }
+        finally
+        {
+            isSavingAdmin = false;
+        }
+    }
+
+    private static List<string> BuildSelectedAdminRoles(AdminRoleSelection selection)
+    {
+        var roles = new List<string> { AuthRoles.Admin };
+        if (selection.Admins) roles.Add(AdminSectionRoles.Admins);
+        if (selection.Products) roles.Add(AdminSectionRoles.Products);
+        if (selection.Orders) roles.Add(AdminSectionRoles.Orders);
+        if (selection.Customers) roles.Add(AdminSectionRoles.Customers);
+        if (selection.Faq) roles.Add(AdminSectionRoles.Faq);
+        if (selection.Notifications) roles.Add(AdminSectionRoles.Notifications);
+        if (selection.Contact) roles.Add(AdminSectionRoles.Contact);
+        if (selection.Support) roles.Add(AdminSectionRoles.Support);
+        return roles;
+    }
+
+    private static bool IsAnyRoleSelected(AdminRoleSelection selection) =>
+        selection.Products || selection.Orders || selection.Customers || selection.Admins ||
+        selection.Faq || selection.Notifications || selection.Contact || selection.Support;
+
+    private static bool IsAllRolesSelected(AdminRoleSelection selection) =>
+        selection.Products && selection.Orders && selection.Customers && selection.Admins &&
+        selection.Faq && selection.Notifications && selection.Contact && selection.Support;
+
+    private static bool IsSupportOnly(AdminRoleSelection selection) =>
+        selection.Support &&
+        !(selection.Products || selection.Orders || selection.Customers || selection.Admins ||
+          selection.Faq || selection.Notifications || selection.Contact);
+
+    private static bool IsOrdersOnly(AdminRoleSelection selection) =>
+        selection.Orders &&
+        !(selection.Products || selection.Customers || selection.Admins ||
+          selection.Faq || selection.Notifications || selection.Contact || selection.Support);
+
+    private void SelectAllAdminRoles()
+    {
+        createAdminRoles.Products = true;
+        createAdminRoles.Orders = true;
+        createAdminRoles.Customers = true;
+        createAdminRoles.Admins = true;
+        createAdminRoles.Faq = true;
+        createAdminRoles.Notifications = true;
+        createAdminRoles.Contact = true;
+        createAdminRoles.Support = true;
+    }
+
+    private void ClearAdminRoles()
+    {
+        createAdminRoles.Products = false;
+        createAdminRoles.Orders = false;
+        createAdminRoles.Customers = false;
+        createAdminRoles.Admins = false;
+        createAdminRoles.Faq = false;
+        createAdminRoles.Notifications = false;
+        createAdminRoles.Contact = false;
+        createAdminRoles.Support = false;
+    }
+
+    private void SelectSupportOnly()
+    {
+        ClearAdminRoles();
+        createAdminRoles.Support = true;
+    }
+
+    private void SelectOrdersOnly()
+    {
+        ClearAdminRoles();
+        createAdminRoles.Orders = true;
+    }
+
+    private void ToggleProductsRole() => createAdminRoles.Products = !createAdminRoles.Products;
+    private void ToggleOrdersRole() => createAdminRoles.Orders = !createAdminRoles.Orders;
+    private void ToggleCustomersRole() => createAdminRoles.Customers = !createAdminRoles.Customers;
+    private void ToggleAdminsRole() => createAdminRoles.Admins = !createAdminRoles.Admins;
+    private void ToggleFaqRole() => createAdminRoles.Faq = !createAdminRoles.Faq;
+    private void ToggleNotificationsRole() => createAdminRoles.Notifications = !createAdminRoles.Notifications;
+    private void ToggleContactRole() => createAdminRoles.Contact = !createAdminRoles.Contact;
+    private void ToggleSupportRole() => createAdminRoles.Support = !createAdminRoles.Support;
+
+    private async Task SaveAdminAsync(AdminUserDto admin)
+    {
+        if (savingAdminIds.Contains(admin.Id))
+        {
+            return;
+        }
+
+        savingAdminIds.Add(admin.Id);
+        StateHasChanged();
+
+        try
+        {
+            var request = new UpdateAdminRequest
+            {
+                FullName = admin.FullName ?? string.Empty,
+                Phone = admin.Phone,
+                IsActive = admin.IsActive
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/auth/admins/{admin.Id}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _ = ShowToastAsync("Failed to update admin.", isError: true);
+                return;
+            }
+
+            await LoadDashboardDataAsync();
+            _ = ShowToastAsync("Admin updated.");
+        }
+        finally
+        {
+            savingAdminIds.Remove(admin.Id);
+            StateHasChanged();
+        }
+    }
+
+    private void StartResetAdminPassword(long adminId)
+    {
+        adminIdResettingPassword = adminId;
+        adminNewPassword = string.Empty;
+    }
+
+    private void CancelResetAdminPassword()
+    {
+        adminIdResettingPassword = null;
+        adminNewPassword = string.Empty;
+    }
+
+    private async Task ResetAdminPasswordAsync(long adminId)
+    {
+        if (savingAdminIds.Contains(adminId) || string.IsNullOrWhiteSpace(adminNewPassword))
+        {
+            _ = ShowToastAsync("Enter a new password.", isError: true);
+            return;
+        }
+
+        savingAdminIds.Add(adminId);
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/auth/admins/{adminId}/password", new ResetPasswordRequest { NewPassword = adminNewPassword });
+            if (!response.IsSuccessStatusCode)
+            {
+                _ = ShowToastAsync("Failed to reset password.", isError: true);
+                return;
+            }
+
+            CancelResetAdminPassword();
+            _ = ShowToastAsync("Password updated.");
+        }
+        finally
+        {
+            savingAdminIds.Remove(adminId);
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteAdminAsync(long adminId)
+    {
+        if (savingAdminIds.Contains(adminId))
+        {
+            return;
+        }
+
+        savingAdminIds.Add(adminId);
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/auth/admins/{adminId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _ = ShowToastAsync("Failed to delete admin.", isError: true);
+                return;
+            }
+
+            await LoadDashboardDataAsync();
+            _ = ShowToastAsync("Admin deleted.");
+        }
+        finally
+        {
+            savingAdminIds.Remove(adminId);
+            StateHasChanged();
+        }
+    }
+
     private async Task ToggleCustomerActiveAsync(AdminUserDto customer)
     {
         var nextActive = !customer.IsActive;
@@ -3156,8 +4420,51 @@ else
             return Task.CompletedTask;
         }
 
-        var nextStatus = IsSupportTicketClosed(selectedQuery.Status) ? "Open" : "Closed";
-        return UpdateSupportTicketStatusAsync(nextStatus);
+        if (IsSupportTicketClosed(selectedQuery.Status))
+        {
+            return UpdateSupportTicketStatusAsync("Open");
+        }
+
+        return CloseSupportTicketAsync(selectedQuery.Id);
+    }
+
+    private async Task CloseSupportTicketAsync(long queryId)
+    {
+        isUpdatingSupportTicketStatus = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/commerce/support/{queryId}/close", new CloseSupportTicketRequest
+            {
+                Message = "✅ Ticket closed by admin. If you still need help, please open a new ticket from your dashboard."
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                statusMessage = "Unable to close support ticket.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            await LoadSupportThreadAsync(queryId);
+
+            var selectedQuery = supportTrace.FirstOrDefault(q => q.Id == queryId);
+            if (selectedQuery is not null)
+            {
+                selectedQuery.Status = "Closed";
+            }
+
+            statusMessage = "Support ticket closed.";
+            _ = ShowToastAsync(statusMessage);
+
+            // Best-effort realtime ping so user view refreshes immediately.
+            await PublishSupportRealtimeStatusAsync("Closed");
+            await PublishSupportRealtimeAsync("✅ Ticket closed by admin.");
+        }
+        finally
+        {
+            isUpdatingSupportTicketStatus = false;
+        }
     }
 
     private async Task UpdateSupportTicketStatusAsync(string nextStatus)
@@ -3257,6 +4564,22 @@ else
         {
             await supportRealtimeInstance.InvokeVoidAsync("sendMessage", messageText);
             await supportRealtimeInstance.InvokeVoidAsync("setTyping", false);
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task PublishSupportRealtimeStatusAsync(string status)
+    {
+        if (supportRealtimeInstance is null || string.IsNullOrWhiteSpace(status))
+        {
+            return;
+        }
+
+        try
+        {
+            await supportRealtimeInstance.InvokeVoidAsync("setStatus", status);
         }
         catch
         {
@@ -3453,6 +4776,29 @@ else
         }
     }
 
+    private async Task DeleteSelectedContactMessageAsync()
+    {
+        var selected = SelectedContactMessage;
+        if (selected is null)
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/commerce/contact-messages/{selected.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            statusMessage = "Failed to delete contact message.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            return;
+        }
+
+        selectedContactMessageId = null;
+        contactReplyRequest = new SendContactReplyRequest();
+        statusMessage = "Contact message deleted.";
+        _ = ShowToastAsync(statusMessage);
+        await LoadDashboardDataAsync();
+    }
+
     private bool MatchesProductFilter(ProductDto product)
     {
         if (string.IsNullOrWhiteSpace(productFilter))
@@ -3554,6 +4900,127 @@ else
         });
 
         return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesAdminFilter(AdminUserDto admin)
+    {
+        if (string.IsNullOrWhiteSpace(adminFilter))
+        {
+            return true;
+        }
+
+        var needle = adminFilter.Trim();
+        var haystack = string.Join(" ", new[]
+        {
+            admin.FullName,
+            admin.Email,
+            admin.Phone,
+            admin.IsActive ? "active" : "inactive"
+        });
+
+        return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnOrderFilterInput(ChangeEventArgs e)
+    {
+        orderFilter = e?.Value?.ToString() ?? string.Empty;
+        visibleOrders = PageSize;
+    }
+
+    private void OnCustomerFilterInput(ChangeEventArgs e)
+    {
+        customerFilter = e?.Value?.ToString() ?? string.Empty;
+        visibleCustomers = PageSize;
+    }
+
+    private void OnActivePlanFilterInput(ChangeEventArgs e)
+    {
+        activePlanFilter = e?.Value?.ToString() ?? string.Empty;
+        visibleActivePlans = PageSize;
+    }
+
+    private bool MatchesActivePlanFilter(ActivePlanDto plan)
+    {
+        if (string.IsNullOrWhiteSpace(activePlanFilter))
+        {
+            return true;
+        }
+
+        var needle = activePlanFilter.Trim();
+        var haystack = string.Join(" ", new[]
+        {
+            plan.OrderId.ToString(),
+            plan.ProductName,
+            plan.UserFullName,
+            plan.UserEmail,
+            plan.PlanState
+        });
+
+        return haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsPlanReminded(long orderId) => remindedPlanOrderIds.Contains(orderId);
+
+    private async Task SendPlanReminderAsync(ActivePlanDto plan)
+    {
+        if (!plan.IsEligibleForReminder)
+        {
+            return;
+        }
+
+        var response = await Http.PostAsync($"api/commerce/active-plans/{plan.OrderId}/remind", content: null);
+        if (!response.IsSuccessStatusCode)
+        {
+            statusMessage = "Failed to send reminder email.";
+            _ = ShowToastAsync(statusMessage, isError: true);
+            return;
+        }
+
+        remindedPlanOrderIds.Add(plan.OrderId);
+        _ = ShowToastAsync($"Reminder email sent to {plan.UserEmail}.");
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromMinutes(1));
+            remindedPlanOrderIds.Remove(plan.OrderId);
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task NotifyAllFilteredPlansAsync()
+    {
+        var orderIds = EligibleFilteredPlanOrderIds;
+        if (orderIds.Count == 0)
+        {
+            return;
+        }
+
+        isBulkNotifyingPlans = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/commerce/active-plans/remind-bulk", new BulkPlanReminderRequest
+            {
+                OrderIds = orderIds
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                statusMessage = "Bulk notify failed.";
+                _ = ShowToastAsync(statusMessage, isError: true);
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var sent = payload.TryGetProperty("sent", out var s) ? s.GetInt32() : 0;
+            var skipped = payload.TryGetProperty("skipped", out var sk) ? sk.GetInt32() : 0;
+            var failed = payload.TryGetProperty("failed", out var f) ? f.GetInt32() : 0;
+
+            _ = ShowToastAsync($"Bulk notify done: sent {sent}, skipped {skipped}, failed {failed}.");
+        }
+        finally
+        {
+            isBulkNotifyingPlans = false;
+        }
     }
 
     private bool MatchesContactFilter(ContactMessageDto contactMessage)

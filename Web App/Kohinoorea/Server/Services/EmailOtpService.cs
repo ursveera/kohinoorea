@@ -12,13 +12,13 @@ public sealed class EmailOtpService : IEmailOtpService
     private const string CachePrefix = "email-otp:";
 
     private readonly IMemoryCache _cache;
-    private readonly IEmailDeliveryService _emailDeliveryService;
+    private readonly IAdminEmailDeliveryService _adminEmailDeliveryService;
     private readonly ILogger<EmailOtpService> _logger;
 
-    public EmailOtpService(IMemoryCache cache, IEmailDeliveryService emailDeliveryService, ILogger<EmailOtpService> logger)
+    public EmailOtpService(IMemoryCache cache, IAdminEmailDeliveryService adminEmailDeliveryService, ILogger<EmailOtpService> logger)
     {
         _cache = cache;
-        _emailDeliveryService = emailDeliveryService;
+        _adminEmailDeliveryService = adminEmailDeliveryService;
         _logger = logger;
     }
 
@@ -44,7 +44,7 @@ public sealed class EmailOtpService : IEmailOtpService
 
         try
         {
-            var (success, message) = await _emailDeliveryService.SendPlainTextEmailAsync(normalizedEmail, subject, body, cancellationToken);
+            var (success, message) = await _adminEmailDeliveryService.SendPlainTextEmailAsync(normalizedEmail, subject, body, cancellationToken);
             if (!success)
             {
                 _logger.LogWarning("OTP email delivery failed for {Email}. Generated OTP was not stored.", normalizedEmail);

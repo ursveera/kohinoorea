@@ -125,6 +125,20 @@ BEGIN
 END
 GO
 
+IF COL_LENGTH('dbo.products', 'valid_from_utc') IS NULL
+BEGIN
+	ALTER TABLE dbo.products
+		ADD valid_from_utc DATETIME2(0) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.products', 'valid_to_utc') IS NULL
+BEGIN
+	ALTER TABLE dbo.products
+		ADD valid_to_utc DATETIME2(0) NULL;
+END
+GO
+
 IF OBJECT_ID(N'dbo.orders', N'U') IS NULL
 BEGIN
 	CREATE TABLE dbo.orders

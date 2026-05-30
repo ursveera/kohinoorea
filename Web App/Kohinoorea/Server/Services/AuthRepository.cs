@@ -42,6 +42,26 @@ public sealed class AuthRepository : IAuthRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<AdminUserDto>> GetAdminsAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .SelectRaw("id as Id")
+            .SelectRaw("full_name as FullName")
+            .SelectRaw("email as Email")
+            .SelectRaw("phone as Phone")
+            .SelectRaw("mt4_broker as Mt4Broker")
+            .SelectRaw("role as Role")
+            .SelectRaw("is_active as IsActive")
+            .SelectRaw("created_at_utc as CreatedAtUtc")
+            .SelectRaw("last_login_at_utc as LastLoginAtUtc")
+            .WhereLike(AuthSqlKataSchema.UserColumns.Role, $"{AuthRoles.Admin}%")
+            .OrderByDesc(AuthSqlKataSchema.UserColumns.CreatedAtUtc)
+            .GetAsync<AdminUserDto>(cancellationToken: cancellationToken);
+
+        return rows.ToList();
+    }
+
     public async Task<IReadOnlyList<string>> GetActiveUserEmailsAsync(CancellationToken cancellationToken = default)
     {
         var rows = await _queryFactory
@@ -108,6 +128,87 @@ public sealed class AuthRepository : IAuthRepository
                 [AuthSqlKataSchema.UserColumns.IsActive] = true,
                 [AuthSqlKataSchema.UserColumns.CreatedAtUtc] = now
             }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<long> CreateAdminAsync(CreateAdminRequest request, string passwordHash, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedPhone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        var roles = NormalizeAdminRoles(request.Roles);
+
+        return await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .InsertGetIdAsync<long>(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.UserColumns.FullName] = request.FullName.Trim(),
+                [AuthSqlKataSchema.UserColumns.Email] = normalizedEmail,
+                [AuthSqlKataSchema.UserColumns.Phone] = normalizedPhone,
+                [AuthSqlKataSchema.UserColumns.Mt4Broker] = null,
+                [AuthSqlKataSchema.UserColumns.PasswordHash] = passwordHash,
+                [AuthSqlKataSchema.UserColumns.Role] = string.Join(";", roles),
+                [AuthSqlKataSchema.UserColumns.IsActive] = true,
+                [AuthSqlKataSchema.UserColumns.CreatedAtUtc] = now
+            }, cancellationToken: cancellationToken);
+    }
+
+    public async Task<bool> UpdateAdminAsync(long adminUserId, UpdateAdminRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalizedPhone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        var roles = NormalizeAdminRoles(request.Roles);
+
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Where(AuthSqlKataSchema.UserColumns.Id, adminUserId)
+            .WhereLike(AuthSqlKataSchema.UserColumns.Role, $"{AuthRoles.Admin}%")
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.UserColumns.FullName] = request.FullName.Trim(),
+                [AuthSqlKataSchema.UserColumns.Phone] = normalizedPhone,
+                [AuthSqlKataSchema.UserColumns.IsActive] = request.IsActive,
+                [AuthSqlKataSchema.UserColumns.Role] = string.Join(";", roles)
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
+    private static List<string> NormalizeAdminRoles(IEnumerable<string>? roles)
+    {
+        var normalized = (roles ?? Array.Empty<string>())
+            .Select(r => r.Trim())
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (!normalized.Any(r => string.Equals(r, AuthRoles.Admin, StringComparison.OrdinalIgnoreCase)))
+        {
+            normalized.Insert(0, AuthRoles.Admin);
+        }
+
+        return normalized;
+    }
+
+    public async Task<bool> UpdateUserPasswordHashAsync(long userId, string passwordHash, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Where(AuthSqlKataSchema.UserColumns.Id, userId)
+            .UpdateAsync(new Dictionary<string, object?>
+            {
+                [AuthSqlKataSchema.UserColumns.PasswordHash] = passwordHash
+            }, cancellationToken: cancellationToken);
+
+        return affected > 0;
+    }
+
+    public async Task<bool> DeleteUserAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        var affected = await _queryFactory
+            .Query(AuthSqlKataSchema.UsersTable)
+            .Where(AuthSqlKataSchema.UserColumns.Id, userId)
+            .DeleteAsync(cancellationToken: cancellationToken);
+
+        return affected > 0;
     }
 
     public async Task<long> CreateSignupSubmissionAsync(SignupRequest request, CancellationToken cancellationToken = default)

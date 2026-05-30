@@ -1,17 +1,34 @@
 using System.Net;
 using System.Net.Mail;
+using Microsoft.Extensions.FileProviders;
 
 namespace Kohinoorea.Server.Services;
 
-public sealed class SmtpEmailDeliveryService : IEmailDeliveryService
+public sealed class SmtpEmailDeliveryService : IEmailDeliveryService, IOrderEmailDeliveryService, ISupportEmailDeliveryService, IAdminEmailDeliveryService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<SmtpEmailDeliveryService> _logger;
+    private readonly IHostEnvironment _hostEnvironment;
+    private readonly string _settingsPrefix;
 
-    public SmtpEmailDeliveryService(IConfiguration configuration, ILogger<SmtpEmailDeliveryService> logger)
+    public SmtpEmailDeliveryService(
+        IConfiguration configuration,
+        ILogger<SmtpEmailDeliveryService> logger,
+        IHostEnvironment? hostEnvironment = null,
+        string settingsPrefix = "Smtp")
     {
         _configuration = configuration;
         _logger = logger;
+        _hostEnvironment = hostEnvironment ?? new FallbackHostEnvironment();
+        _settingsPrefix = string.IsNullOrWhiteSpace(settingsPrefix) ? "Smtp" : settingsPrefix.Trim();
+    }
+
+    private sealed class FallbackHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Production;
+        public string ApplicationName { get; set; } = string.Empty;
+        public string ContentRootPath { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
     public async Task<(bool Success, string Message)> SendPlainTextEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken)
@@ -34,11 +51,15 @@ public sealed class SmtpEmailDeliveryService : IEmailDeliveryService
             return (false, "Email message is required.");
         }
 
-        var smtpHost = _configuration["Smtp:Host"];
-        var fromAddress = _configuration["Smtp:From"];
+        var smtpHost = _configuration[$"{_settingsPrefix}:Host"];
+        var fromAddress = _configuration[$"{_settingsPrefix}:From"];
         if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(fromAddress))
         {
-            _logger.LogWarning("SMTP is not configured (missing Smtp:Host or Smtp:From). Email to {Email} was skipped.", normalizedEmail);
+            _logger.LogWarning(
+                "SMTP is not configured (missing {Prefix} Host or {Prefix} From). Email to {Email} was skipped.",
+                _settingsPrefix,
+                _settingsPrefix,
+                normalizedEmail);
             return (false, "Email service is not configured yet. Please update the SMTP settings.");
         }
 
@@ -58,7 +79,9 @@ public sealed class SmtpEmailDeliveryService : IEmailDeliveryService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send email to {Email}", normalizedEmail);
-            return (false, "Unable to send email right now. Please try again.");
+            return _hostEnvironment.IsDevelopment()
+                ? (false, $"Unable to send email: {FormatExceptionForClient(ex)}")
+                : (false, "Unable to send email right now. Please try again.");
         }
     }
 
@@ -82,11 +105,15 @@ public sealed class SmtpEmailDeliveryService : IEmailDeliveryService
             return (false, "Email message is required.");
         }
 
-        var smtpHost = _configuration["Smtp:Host"];
-        var fromAddress = _configuration["Smtp:From"];
+        var smtpHost = _configuration[$"{_settingsPrefix}:Host"];
+        var fromAddress = _configuration[$"{_settingsPrefix}:From"];
         if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(fromAddress))
         {
-            _logger.LogWarning("SMTP is not configured (missing Smtp:Host or Smtp:From). Email to {Email} was skipped.", normalizedEmail);
+            _logger.LogWarning(
+                "SMTP is not configured (missing {Prefix} Host or {Prefix} From). Email to {Email} was skipped.",
+                _settingsPrefix,
+                _settingsPrefix,
+                normalizedEmail);
             return (false, "Email service is not configured yet. Please update the SMTP settings.");
         }
 
@@ -106,16 +133,40 @@ public sealed class SmtpEmailDeliveryService : IEmailDeliveryService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send email to {Email}", normalizedEmail);
-            return (false, "Unable to send email right now. Please try again.");
+            return _hostEnvironment.IsDevelopment()
+                ? (false, $"Unable to send email: {FormatExceptionForClient(ex)}")
+                : (false, "Unable to send email right now. Please try again.");
         }
+    }
+
+    private static string FormatExceptionForClient(Exception ex)
+    {
+        if (ex is SmtpException smtpEx)
+        {
+            var status = smtpEx.StatusCode != SmtpStatusCode.GeneralFailure
+                ? $"SMTP status: {smtpEx.StatusCode}. "
+                : string.Empty;
+
+            var inner = smtpEx.InnerException is not null
+                ? $" Inner: {smtpEx.InnerException.GetType().Name}: {smtpEx.InnerException.Message}"
+                : string.Empty;
+
+            return $"{status}{smtpEx.Message}{inner}";
+        }
+
+        var fallbackInner = ex.InnerException is not null
+            ? $" Inner: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}"
+            : string.Empty;
+
+        return $"{ex.GetType().Name}: {ex.Message}{fallbackInner}";
     }
 
     private SmtpClient BuildSmtpClient(string host)
     {
-        var port = int.TryParse(_configuration["Smtp:Port"], out var parsedPort) ? parsedPort : 587;
-        var enableSsl = !bool.TryParse(_configuration["Smtp:EnableSsl"], out var parsedSsl) || parsedSsl;
-        var username = _configuration["Smtp:Username"];
-        var password = _configuration["Smtp:Password"];
+        var port = int.TryParse(_configuration[$"{_settingsPrefix}:Port"], out var parsedPort) ? parsedPort : 587;
+        var enableSsl = !bool.TryParse(_configuration[$"{_settingsPrefix}:EnableSsl"], out var parsedSsl) || parsedSsl;
+        var username = _configuration[$"{_settingsPrefix}:Username"];
+        var password = _configuration[$"{_settingsPrefix}:Password"];
 
         var client = new SmtpClient(host, port)
         {

@@ -48,6 +48,8 @@ public static class AuthSqlKataSchema
         public const string IsActive = "is_active";
         public const string IsMaster = "is_master";
         public const string CountryCode = "country_code";
+        public const string ValidFromUtc = "valid_from_utc";
+        public const string ValidToUtc = "valid_to_utc";
         public const string CreatedAtUtc = "created_at_utc";
     }
 

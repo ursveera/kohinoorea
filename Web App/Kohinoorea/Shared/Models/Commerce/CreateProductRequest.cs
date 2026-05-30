@@ -23,4 +23,10 @@ public sealed class CreateProductRequest
 
     [StringLength(5)]
     public string? CountryCode { get; set; }
+
+    // Optional plan validity window (UTC).
+    // If set, an order for this product can be treated as active within this range.
+    public DateTime? ValidFromUtc { get; set; }
+
+    public DateTime? ValidToUtc { get; set; }
 }

@@ -588,6 +588,10 @@
         {
             isLoggedIn = true;
             loggedInUserName = GetUserNameFromToken(authToken);
+            if (string.IsNullOrWhiteSpace(loggedInUserName))
+            {
+                loggedInUserName = indexLoginEmail?.Trim();
+            }
         }
         else
         {
@@ -628,12 +632,34 @@
             var parts = token.Split('.');
             if (parts.Length != 3) return null;
             var payload = System.Text.Json.JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(PadBase64(parts[1])));
-            if (payload.RootElement.TryGetProperty("unique_name", out var name))
-                return name.GetString();
-            if (payload.RootElement.TryGetProperty("email", out var email))
-                return email.GetString();
-            if (payload.RootElement.TryGetProperty("sub", out var sub))
-                return sub.GetString();
+
+            static string? ReadString(System.Text.Json.JsonElement element) =>
+                element.ValueKind == System.Text.Json.JsonValueKind.String ? element.GetString() : null;
+
+            var candidateKeys = new[]
+            {
+                "unique_name",
+                "name",
+                "full_name",
+                "given_name",
+                "preferred_username",
+                "email",
+                "sub",
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+            };
+
+            foreach (var key in candidateKeys)
+            {
+                if (payload.RootElement.TryGetProperty(key, out var value))
+                {
+                    var str = ReadString(value);
+                    if (!string.IsNullOrWhiteSpace(str))
+                    {
+                        return str.Trim();
+                    }
+                }
+            }
         }
         catch { }
         return null;

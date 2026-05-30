@@ -108,10 +108,18 @@ export function createSupportChat(dotNetRef, roomId, options) {
   });
   disposers.push(() => off(typingRef, "value", onTyping));
 
-  // Ensure room meta exists (best-effort)
-  set(metaRef, {
-    updatedAt: serverTimestamp(),
-  }).catch(() => {});
+  const onMeta = onValue(metaRef, (snap) => {
+    const val = snap.val() || {};
+    dotNetRef.invokeMethodAsync("OnMeta", {
+      status: val.status || null,
+      updatedAt: val.updatedAt || null,
+      lastMessage: val.lastMessage || null,
+    });
+  });
+  disposers.push(() => off(metaRef, "value", onMeta));
+
+  // Ensure room meta exists (best-effort) without overwriting existing keys.
+  update(metaRef, { updatedAt: serverTimestamp() }).catch(() => {});
 
   async function setTyping(isTyping) {
     const node = ref(db, `${base}/typing/${resolvedClientId}`);
@@ -147,12 +155,19 @@ export function createSupportChat(dotNetRef, roomId, options) {
     }
   }
 
+  async function setStatus(status) {
+    const trimmed = String(status || "").trim();
+    if (!trimmed) return;
+    await update(metaRef, { status: trimmed, updatedAt: serverTimestamp() });
+  }
+
   return {
     roomId,
     getClientId: () => resolvedClientId,
     getRole: () => resolvedRole,
     getDisplayName: () => resolvedName,
     sendMessage,
+    setStatus,
     setTyping,
     dispose: () => {
       for (const d of disposers.splice(0)) {

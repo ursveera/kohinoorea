@@ -18,5 +18,9 @@ public sealed class ProductDto
 
     public string? CountryCode { get; set; }
 
+    public DateTime? ValidFromUtc { get; set; }
+
+    public DateTime? ValidToUtc { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }
